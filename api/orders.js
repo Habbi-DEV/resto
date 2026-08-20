@@ -27,7 +27,27 @@ export default async function handler(req, res) {
   try {
     // ------------------------------------------------------------- GET
     if (req.method === 'GET') {
-      const { id, status, order_type, limit } = req.query;
+      const { id, status, order_type, limit, counts } = req.query;
+
+      // Real per-status totals via SQL COUNT — independent of the row
+      // limit used for the list view, so badges/tabs stay correct no
+      // matter how many orders exist (previously they were computed by
+      // counting a capped, truncated list of fetched rows: 60 in the
+      // sidebar, 120 in the Orders page, so both under-reported once
+      // order volume passed those caps).
+      if (counts) {
+        const STATUSES = ['pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery', 'completed', 'cancelled'];
+        const { count: all, error: allErr } = await supabase
+          .from('orders').select('*', { count: 'exact', head: true });
+        if (allErr) throw allErr;
+        const perStatus = await Promise.all(STATUSES.map(async (s) => {
+          const { count, error } = await supabase
+            .from('orders').select('*', { count: 'exact', head: true }).eq('status', s);
+          if (error) throw error;
+          return [s, count || 0];
+        }));
+        return res.status(200).json({ all: all || 0, ...Object.fromEntries(perStatus) });
+      }
 
       if (id) {
         const { data: order, error } = await supabase
