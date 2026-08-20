@@ -1,0 +1,119 @@
+import { useEffect, useState } from 'react';
+import { CheckCircle2, XCircle } from 'lucide-react';
+import type { Order, OrderStatus } from '../../lib/types';
+import { orderNumber } from '../../lib/format';
+
+const STEPS: OrderStatus[] = ['pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery', 'completed'];
+
+const LABEL: Record<string, string> = {
+  pending: 'Order received',
+  confirmed: 'Confirmed',
+  preparing: 'In the kitchen',
+  ready: 'Ready',
+  out_for_delivery: 'On the way',
+  completed: 'Served',
+};
+
+const HINT: Record<string, string> = {
+  pending: 'Waiting for the restaurant to confirm your order…',
+  confirmed: 'Your order has been accepted 👍',
+  preparing: 'The kitchen is on it 👨‍🍳',
+  ready: 'Ready! We will bring it to your table shortly.',
+  out_for_delivery: 'Your courier is on the way 🛵',
+  completed: 'Enjoy your meal! Bon appétit 🧡',
+};
+
+interface Props {
+  order: Order;
+  onClose: () => void;
+}
+
+export default function OrderTracker({ order: initial, onClose }: Props) {
+  const [order, setOrder] = useState<Order>(initial);
+
+  useEffect(() => {
+    const iv = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/orders?id=${initial.id}`);
+        if (res.ok) setOrder(await res.json());
+      } catch {
+        /* keep last known state */
+      }
+    }, 3000);
+    return () => clearInterval(iv);
+  }, [initial.id]);
+
+  const cancelled = order.status === 'cancelled';
+  const steps = STEPS.filter((s) => s !== 'out_for_delivery' || order.order_type === 'delivery');
+  const currentIdx = steps.indexOf(order.status);
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-white">
+      <div className="mx-auto flex min-h-full max-w-md flex-col px-6 py-10">
+        <div className="flex flex-col items-center text-center">
+          {cancelled ? (
+            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-red-50">
+              <XCircle size={44} className="text-red-500" />
+            </div>
+          ) : (
+            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-brand-50">
+              <CheckCircle2 size={44} className="text-brand-500" />
+            </div>
+          )}
+          <h2 className="mt-5 font-display text-2xl font-bold text-zinc-900">
+            {cancelled ? 'Order cancelled' : 'Order placed!'}
+          </h2>
+          <p className="mt-1 text-sm text-zinc-500">
+            {cancelled
+              ? 'The restaurant had to cancel this order. Please ask our staff for help.'
+              : `Your order ${orderNumber(order.id)} is being processed.`}
+          </p>
+        </div>
+
+        {!cancelled && (
+          <>
+            <div className="mt-8 rounded-2xl bg-brand-50 p-4 text-center text-sm font-medium text-brand-800">
+              {HINT[order.status]}
+            </div>
+
+            <div className="mt-8 flex-1">
+              {steps.map((s, i) => {
+                const done = i <= currentIdx;
+                const isLast = i === steps.length - 1;
+                return (
+                  <div key={s} className="flex gap-4">
+                    <div className="flex flex-col items-center">
+                      <div
+                        className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold transition ${
+                          done ? 'bg-brand-500 text-white' : 'bg-zinc-100 text-zinc-400'
+                        } ${i === currentIdx ? 'ring-4 ring-brand-100' : ''}`}
+                      >
+                        {i + 1}
+                      </div>
+                      {!isLast && <div className={`w-0.5 flex-1 ${done && i < currentIdx ? 'bg-brand-400' : 'bg-zinc-100'}`} style={{ minHeight: 28 }} />}
+                    </div>
+                    <div className="pb-6 pt-1">
+                      <p className={`text-sm font-semibold ${done ? 'text-zinc-900' : 'text-zinc-400'}`}>
+                        {LABEL[s]}
+                      </p>
+                      {i === currentIdx && (
+                        <p className="text-xs font-medium text-brand-600">Current step · live</p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+
+        <button
+          onClick={onClose}
+          className="mt-8 w-full rounded-full bg-zinc-900 py-3.5 font-display text-[15px] font-bold text-white transition hover:bg-zinc-800 active:scale-[0.98]"
+        >
+          Back to menu
+        </button>
+      </div>
+    </div>
+  );
+}
