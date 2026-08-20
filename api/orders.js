@@ -99,7 +99,9 @@ export default async function handler(req, res) {
         const quantity = Math.max(1, Math.min(99, parseInt(it.quantity, 10) || 1));
         const line_total = Math.round(p.price * quantity * 100) / 100;
         subtotal += line_total;
-        rows.push({ product_id: p.id, product_name: p.name, unit_price: p.price, quantity, line_total });
+        // line_total is NOT sent: it's a Postgres generated column
+        // (unit_price * quantity, stored) — inserting a value for it fails.
+        rows.push({ product_id: p.id, product_name: p.name, unit_price: p.price, quantity });
       }
       subtotal = Math.round(subtotal * 100) / 100;
       const tax_amount = Math.round(subtotal * TAX_RATE * 100) / 100;

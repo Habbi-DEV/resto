@@ -137,7 +137,7 @@ export default function OrdersPage() {
                       <span className="ml-2 shrink-0 text-zinc-400">{money(it.line_total)}</span>
                     </p>
                   ))}
-                  {(!o.items || o.items.length === 0) && <p className="text-zinc-400">Items loading…</p>}
+                  {(!o.items || o.items.length === 0) && <p className="text-zinc-400">No items recorded</p>}
                   {(o.items?.length ?? 0) > 4 && <p className="pt-0.5 text-[10px] text-zinc-400">+{o.items!.length - 4} more</p>}
                 </div>
 
