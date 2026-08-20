@@ -1,6 +1,6 @@
 import supabase from './db-client.js';
 
-const TABLE_STATUSES = ['available', 'occupied', 'reserved'];
+const TABLE_STATUSES = ['available', 'occupied', 'reserved', 'cleaning'];
 
 async function requireStaff(req, res) {
   const token = req.headers.authorization?.replace('Bearer ', '');
