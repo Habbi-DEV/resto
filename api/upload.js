@@ -20,11 +20,11 @@ export default async function handler(req, res) {
     const safeName = `products/${Date.now()}-${fileName.replace(/[^a-zA-Z0-9.\-_]/g, '_')}`;
     const buffer = Buffer.from(fileBase64, 'base64');
     const { error } = await supabase.storage
-      .from('restolink-media')
+      .from('menu-images')
       .upload(safeName, buffer, { contentType: contentType || 'image/jpeg', upsert: true });
     if (error) throw error;
 
-    const { data: urlData } = supabase.storage.from('restolink-media').getPublicUrl(safeName);
+    const { data: urlData } = supabase.storage.from('menu-images').getPublicUrl(safeName);
     return res.status(200).json({ url: urlData.publicUrl });
   } catch (err) {
     console.error('upload API error:', err);

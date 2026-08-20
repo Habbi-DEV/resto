@@ -243,6 +243,12 @@ export default function MenuManagePage() {
 
           <div>
             <label className="mb-1 block text-[10px] font-bold uppercase text-zinc-400">Photo</label>
+            <input
+              value={form.image_url}
+              onChange={(e) => setForm({ ...form, image_url: e.target.value })}
+              placeholder="https://…  (paste an image link, or upload below)"
+              className="mb-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-sm outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
+            />
             <div className="flex items-center gap-3">
               {form.image_url ? (
                 <img src={form.image_url} alt="" className="h-14 w-14 rounded-xl object-cover ring-1 ring-zinc-200" />
