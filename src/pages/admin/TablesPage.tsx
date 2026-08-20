@@ -11,6 +11,7 @@ const STATUS_META: Record<TableStatus, { label: string; cls: string }> = {
   available: { label: 'Available', cls: 'bg-sky-50 text-sky-600 ring-sky-200' },
   occupied: { label: 'Occupied', cls: 'bg-brand-50 text-brand-700 ring-brand-200' },
   reserved: { label: 'Reserved', cls: 'bg-indigo-50 text-indigo-600 ring-indigo-200' },
+  cleaning: { label: 'Cleaning', cls: 'bg-zinc-100 text-zinc-500 ring-zinc-200' },
 };
 
 export default function TablesPage() {
@@ -81,7 +82,8 @@ export default function TablesPage() {
           <p className="text-sm text-zinc-500">
             {tables.filter((t) => t.status === 'available').length} available ·{' '}
             {tables.filter((t) => t.status === 'occupied').length} occupied ·{' '}
-            {tables.filter((t) => t.status === 'reserved').length} reserved
+            {tables.filter((t) => t.status === 'reserved').length} reserved ·{' '}
+            {tables.filter((t) => t.status === 'cleaning').length} cleaning
           </p>
         </div>
         <button onClick={() => setModalOpen(true)} className="flex items-center gap-2 rounded-xl bg-brand-500 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-orange-500/30 hover:bg-brand-600">
@@ -110,7 +112,7 @@ export default function TablesPage() {
               )}
 
               <div className="mt-3 flex gap-1.5">
-                {(['available', 'occupied', 'reserved'] as TableStatus[]).map((s) => (
+                {(['available', 'occupied', 'reserved', 'cleaning'] as TableStatus[]).map((s) => (
                   <button
                     key={s}
                     onClick={() => setStatus(t, s)}
