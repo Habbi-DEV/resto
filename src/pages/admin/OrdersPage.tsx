@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { MapPin, Phone, Trash2, Users } from 'lucide-react';
 import useLiveOrders from '../../hooks/useLiveOrders';
 import StatusBadge from '../../components/StatusBadge';
@@ -54,11 +54,16 @@ export default function OrdersPage() {
     [orders, statusFilter, typeFilter],
   );
 
-  const counts = useMemo(() => {
-    const c: Record<string, number> = { all: orders.length };
-    for (const o of orders) c[o.status] = (c[o.status] || 0) + 1;
-    return c;
-  }, [orders]);
+  // Real per-status totals from the DB, not a count over the capped
+  // 120-row fetch above — otherwise "All" / "Pending" etc. silently
+  // plateau at whatever the fetch limit is once order volume passes it.
+  const [counts, setCounts] = useState<Record<string, number>>({ all: 0 });
+  useEffect(() => {
+    const loadCounts = () => fetch('/api/orders?counts=1').then((r) => r.json()).then(setCounts).catch(console.error);
+    loadCounts();
+    const iv = setInterval(loadCounts, 4000);
+    return () => clearInterval(iv);
+  }, []);
 
   const setStatus = async (id: number, status: OrderStatus) => {
     setBusyId(id);

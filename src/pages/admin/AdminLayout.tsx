@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
   Armchair, Database, ExternalLink, LayoutDashboard, LogOut,
@@ -5,8 +6,7 @@ import {
 } from 'lucide-react';
 import supabase from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import useLiveOrders from '../../hooks/useLiveOrders';
-import { ACTIVE_STATUSES } from '../../lib/types';
+import type { Stats } from '../../lib/types';
 
 const NAV = [
   { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, end: true },
@@ -33,8 +33,16 @@ function Brand() {
 export default function AdminLayout() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { orders } = useLiveOrders(60, 8000);
-  const activeCount = orders.filter((o) => ACTIVE_STATUSES.includes(o.status)).length;
+  // Real active-order total from /api/stats, not a count over the latest
+  // 60 fetched orders — that cap meant the badge silently stopped
+  // climbing once there were more than 60 orders in play.
+  const [activeCount, setActiveCount] = useState(0);
+  useEffect(() => {
+    const load = () => fetch('/api/stats').then((r) => r.json()).then((s: Stats) => setActiveCount(s.active_orders)).catch(console.error);
+    load();
+    const iv = setInterval(load, 8000);
+    return () => clearInterval(iv);
+  }, []);
 
   const signOut = async () => {
     await supabase.auth.signOut();
