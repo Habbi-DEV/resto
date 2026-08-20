@@ -9,7 +9,7 @@ export type OrderStatus =
   | 'completed'
   | 'cancelled';
 
-export type TableStatus = 'available' | 'occupied' | 'reserved';
+export type TableStatus = 'available' | 'occupied' | 'reserved' | 'cleaning';
 
 export interface Category {
   id: number;
