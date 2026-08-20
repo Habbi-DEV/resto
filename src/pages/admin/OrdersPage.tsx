@@ -1,9 +1,10 @@
-import { useMemo, useState } from 'react';
-import { MapPin, Phone, Trash2, Users } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { MapPin, Phone, Printer, Trash2, Users } from 'lucide-react';
 import useLiveOrders from '../../hooks/useLiveOrders';
 import StatusBadge from '../../components/StatusBadge';
 import { OrderTypeTag } from '../../components/OrderTypeTag';
 import Spinner from '../../components/ui/Spinner';
+import InvoiceModal from '../../components/InvoiceModal';
 import { api } from '../../lib/api';
 import { money, orderNumber, timeAgo } from '../../lib/format';
 import type { Order, OrderStatus, OrderType } from '../../lib/types';
@@ -45,6 +46,7 @@ export default function OrdersPage() {
   const [statusFilter, setStatusFilter] = useState<OrderStatus | 'all'>('all');
   const [typeFilter, setTypeFilter] = useState<OrderType | 'all'>('all');
   const [busyId, setBusyId] = useState<number | null>(null);
+  const [printOrder, setPrintOrder] = useState<Order | null>(null);
 
   const filtered = useMemo(
     () => orders.filter((o) =>
@@ -54,11 +56,16 @@ export default function OrdersPage() {
     [orders, statusFilter, typeFilter],
   );
 
-  const counts = useMemo(() => {
-    const c: Record<string, number> = { all: orders.length };
-    for (const o of orders) c[o.status] = (c[o.status] || 0) + 1;
-    return c;
-  }, [orders]);
+  // Real per-status totals from the DB, not a count over the capped
+  // 120-row fetch above — otherwise "All" / "Pending" etc. silently
+  // plateau at whatever the fetch limit is once order volume passes it.
+  const [counts, setCounts] = useState<Record<string, number>>({ all: 0 });
+  useEffect(() => {
+    const loadCounts = () => fetch('/api/orders?counts=1').then((r) => r.json()).then(setCounts).catch(console.error);
+    loadCounts();
+    const iv = setInterval(loadCounts, 4000);
+    return () => clearInterval(iv);
+  }, []);
 
   const setStatus = async (id: number, status: OrderStatus) => {
     setBusyId(id);
@@ -145,7 +152,17 @@ export default function OrdersPage() {
 
                 <div className="mt-3 flex items-center justify-between border-t border-zinc-50 pt-3">
                   <span className="font-display text-base font-bold text-zinc-900">{money(o.total)}</span>
-                  <StatusBadge status={o.status} />
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setPrintOrder(o)}
+                      className="rounded-full p-1.5 text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700"
+                      aria-label={`Print invoice for order ${orderNumber(o.id)}`}
+                      title="Print invoice"
+                    >
+                      <Printer size={15} />
+                    </button>
+                    <StatusBadge status={o.status} />
+                  </div>
                 </div>
 
                 {(action || cancellable) && (
@@ -188,6 +205,8 @@ export default function OrdersPage() {
           })}
         </div>
       )}
+
+      <InvoiceModal order={printOrder} onClose={() => setPrintOrder(null)} />
     </div>
   );
 }
