@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Check, Minus, Plus, Search, Trash2 } from 'lucide-react';
+import { Check, Minus, Plus, Printer, Search, Trash2 } from 'lucide-react';
 import type { Category, Order, Product, RestaurantTable } from '../../lib/types';
 import { api } from '../../lib/api';
 import { money, orderNumber, timeAgo } from '../../lib/format';
@@ -8,6 +8,7 @@ import useLiveOrders from '../../hooks/useLiveOrders';
 import StatusBadge from '../../components/StatusBadge';
 import { OrderTypeTag, orderContext } from '../../components/OrderTypeTag';
 import Spinner from '../../components/ui/Spinner';
+import InvoiceModal from '../../components/InvoiceModal';
 import type { OrderType } from '../../lib/types';
 
 const TAX_RATE = 0.10;
@@ -43,6 +44,8 @@ export default function RegisterPage() {
   const [notes, setNotes] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [placing, setPlacing] = useState(false);
+  const [lastOrder, setLastOrder] = useState<Order | null>(null);
+  const [printOrder, setPrintOrder] = useState<Order | null>(null);
 
   const loadAll = () => {
     Promise.all([
@@ -97,6 +100,7 @@ export default function RegisterPage() {
       });
       clear();
       setTableNumber(null); setName(''); setPhone(''); setAddress(''); setNotes('');
+      setLastOrder(order);
       setFlash(`Order ${orderNumber(order.id)} sent to kitchen ✅`);
       setTimeout(() => setFlash(''), 3500);
       setTab('live');
@@ -183,7 +187,19 @@ export default function RegisterPage() {
           ))}
         </div>
 
-        {flash && <div className="mx-3 mt-3 rounded-xl bg-brand-50 px-3 py-2 text-xs font-bold text-brand-700">{flash}</div>}
+        {flash && (
+          <div className="mx-3 mt-3 flex items-center justify-between gap-2 rounded-xl bg-brand-50 px-3 py-2 text-xs font-bold text-brand-700">
+            <span>{flash}</span>
+            {lastOrder && (
+              <button
+                onClick={() => setPrintOrder(lastOrder)}
+                className="flex shrink-0 items-center gap-1 rounded-lg bg-white px-2 py-1 text-[11px] text-brand-600 shadow-sm hover:bg-brand-100"
+              >
+                <Printer size={12} /> Print
+              </button>
+            )}
+          </div>
+        )}
 
         {tab === 'ticket' ? (
           <div className="thin-scroll flex flex-1 flex-col overflow-y-auto p-4">
@@ -287,6 +303,14 @@ export default function RegisterPage() {
                       <span className="text-[11px] text-zinc-500">{orderContext(o)}</span>
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-bold">{money(o.total)}</span>
+                        <button
+                          onClick={() => setPrintOrder(o)}
+                          className="rounded-full p-1 text-zinc-300 transition hover:bg-zinc-100 hover:text-zinc-600"
+                          aria-label={`Print invoice for order ${orderNumber(o.id)}`}
+                          title="Print invoice"
+                        >
+                          <Printer size={13} />
+                        </button>
                         <StatusBadge status={o.status} />
                       </div>
                     </div>
@@ -300,6 +324,8 @@ export default function RegisterPage() {
           </div>
         )}
       </aside>
+
+      <InvoiceModal order={printOrder} onClose={() => setPrintOrder(null)} />
     </div>
   );
 }
