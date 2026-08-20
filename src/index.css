@@ -34,22 +34,3 @@ body {
 .thin-scroll::-webkit-scrollbar-track { background: transparent; }
 .thin-scroll::-webkit-scrollbar-thumb { background: #d4d4d8; border-radius: 999px; }
 .thin-scroll::-webkit-scrollbar-thumb:hover { background: #a1a1aa; }
-
-/* -------- Invoice printing --------
- * When printing, hide everything on the page except the invoice
- * markup itself so the customer/kitchen copy isn't cluttered with
- * the admin dashboard chrome, modal overlay, or the Print button. */
-@media print {
-  body * { visibility: hidden; }
-  #invoice-print-area, #invoice-print-area * { visibility: visible; }
-  #invoice-print-area {
-    position: absolute;
-    inset: 0 auto auto 0;
-    width: 100%;
-    max-width: 340px;
-    margin: 0 auto;
-    padding: 12px;
-    color: #000;
-  }
-  .no-print { display: none !important; }
-}
