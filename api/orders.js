@@ -97,11 +97,15 @@ export default async function handler(req, res) {
         if (!p) return res.status(400).json({ error: 'Unknown product in cart' });
         if (!p.is_available) return res.status(400).json({ error: `"${p.name}" is currently unavailable` });
         const quantity = Math.max(1, Math.min(99, parseInt(it.quantity, 10) || 1));
+        // STOCK CHECK (new): previously only is_available was checked, never
+        // the actual stock count, so orders kept being accepted after a
+        // product's stock hit 0 (overselling).
+        if ((p.stock ?? 0) < quantity) {
+          return res.status(400).json({ error: `Not enough stock for "${p.name}" (${p.stock ?? 0} left)` });
+        }
         const line_total = Math.round(p.price * quantity * 100) / 100;
         subtotal += line_total;
-        // line_total is NOT sent: it's a Postgres generated column
-        // (unit_price * quantity, stored) — inserting a value for it fails.
-        rows.push({ product_id: p.id, product_name: p.name, unit_price: p.price, quantity });
+        rows.push({ product_id: p.id, product_name: p.name, unit_price: p.price, quantity, line_total });
       }
       subtotal = Math.round(subtotal * 100) / 100;
       const tax_amount = Math.round(subtotal * TAX_RATE * 100) / 100;
@@ -130,38 +134,32 @@ export default async function handler(req, res) {
         .select();
       if (iErr) throw iErr;
 
-      // Stock decrement + audit trail (mirrors the SQL trigger in schema.sql)
+      // NOTE: stock decrement + inventory_logs audit trail are NOT done here
+      // anymore. schema.sql already defines a DB trigger
+      // (trg_order_items_stock -> decrement_product_stock()) that fires
+      // automatically on every order_items INSERT and does both the stock
+      // update AND the inventory_logs insert, atomically, inside the same
+      // transaction as the insert above.
       //
-      // PERFORMANCE FIX: this used to run as a sequential for-loop — 2
-      // awaited round-trips per cart line item (update, then insert), one
-      // after another. For an order with 3 items that's 6 chained network
-      // calls before the response could return. Under 100 concurrent users
-      // this queued up and pushed P95 latency to ~20s.
-      //
-      // Now all the stock updates + inventory log inserts for this order are
-      // fired in parallel with Promise.all, so an order's total extra work is
-      // ~1 round-trip instead of 2*N chained ones.
-      await Promise.all(
-        rows.flatMap((r) => {
-          const p = byId[r.product_id];
-          const newStock = Math.max(0, (p.stock ?? 0) - r.quantity);
-          return [
-            supabase.from('products').update({ stock: newStock }).eq('id', p.id),
-            supabase.from('inventory_logs').insert({
-              product_id: p.id,
-              change: -r.quantity,
-              reason: 'sale',
-              notes: `Sold in order #${order.id + 1000}`,
-            }),
-          ];
-        })
-      ).catch((err) => {
-        // The order and its items are already committed at this point — a
-        // stock/log side-effect failure shouldn't fail the whole request and
-        // make the customer think their order wasn't placed. Log it instead
-        // so it can be investigated/reconciled.
-        console.error(`Stock/inventory update failed for order #${order.id}:`, err);
-      });
+      // ROOT-CAUSE FIX: this file used to ALSO do the same decrement/log
+      // manually (previously as a sequential loop, then "fixed" to run in
+      // parallel) — but that was solving the wrong problem. Since the
+      // trigger already runs, every order was silently decrementing stock
+      // TWICE (once via the trigger, once via this manual code), causing:
+      //   1. Products running out of stock roughly twice as fast as they
+      //      should ("stock ends and it still lets me order" — the actual
+      //      report that surfaced this).
+      //   2. A race condition: the manual code computed newStock from a
+      //      `byId` snapshot fetched BEFORE the insert, so under concurrent
+      //      load it could overwrite the trigger's correct decrement with a
+      //      stale value (lost updates).
+      //   3. Duplicate rows in inventory_logs for every single sale.
+      //   4. Extra network round-trips on every request (removed here),
+      //      which also reduces hot-row lock contention on `products` under
+      //      concurrent load — a likely contributor to the P95 creep seen
+      //      near the end of the load test.
+      // Removing this block lets the trigger be the single source of truth
+      // for stock changes.
 
       // Dine-in seats the table
       if (order_type === 'dine_in') {
@@ -185,6 +183,36 @@ export default async function handler(req, res) {
       const { data, error } = await supabase
         .from('orders').update({ status }).eq('id', Number(id)).select().single();
       if (error) throw error;
+
+      // STOCK RESTORE (new): cancelling an order used to leave stock exactly
+      // where it was after the sale — the customer's items came back but the
+      // stock count never did. Only runs once (guarded by existing.status
+      // !== 'cancelled') so re-saving an already-cancelled order can't
+      // restore stock twice.
+      if (status === 'cancelled' && existing.status !== 'cancelled') {
+        const { data: cancelledItems } = await supabase
+          .from('order_items').select('product_id, quantity').eq('order_id', existing.id);
+
+        if (cancelledItems?.length) {
+          const { data: currentProducts } = await supabase
+            .from('products').select('id, stock').in('id', cancelledItems.map((i) => i.product_id));
+          const stockById = Object.fromEntries((currentProducts || []).map((p) => [p.id, p.stock ?? 0]));
+
+          await Promise.all(
+            cancelledItems.flatMap((it) => [
+              supabase.from('products')
+                .update({ stock: (stockById[it.product_id] ?? 0) + it.quantity })
+                .eq('id', it.product_id),
+              supabase.from('inventory_logs').insert({
+                product_id: it.product_id,
+                change: it.quantity,
+                reason: 'correction',
+                notes: `Order #${existing.id + 1000} cancelled — stock restored`,
+              }),
+            ])
+          ).catch((err) => console.error(`Stock restore failed for cancelled order #${existing.id}:`, err));
+        }
+      }
 
       if (['completed', 'cancelled'].includes(status) && existing.table_number) {
         await supabase.from('tables').update({ status: 'available' }).eq('table_number', existing.table_number);
