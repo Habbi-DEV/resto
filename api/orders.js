@@ -105,7 +105,9 @@ export default async function handler(req, res) {
         }
         const line_total = Math.round(p.price * quantity * 100) / 100;
         subtotal += line_total;
-        rows.push({ product_id: p.id, product_name: p.name, unit_price: p.price, quantity, line_total });
+        // line_total is a GENERATED ALWAYS column in the DB (unit_price * quantity),
+        // so it must NOT be included in the insert — Postgres computes it itself.
+        rows.push({ product_id: p.id, product_name: p.name, unit_price: p.price, quantity });
       }
       subtotal = Math.round(subtotal * 100) / 100;
       const tax_amount = Math.round(subtotal * TAX_RATE * 100) / 100;
