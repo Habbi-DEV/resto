@@ -19,9 +19,19 @@ export default async function handler(req, res) {
 
     const safeName = `products/${Date.now()}-${fileName.replace(/[^a-zA-Z0-9.\-_]/g, '_')}`;
     const buffer = Buffer.from(fileBase64, 'base64');
+
+    const EXT_MIME = {
+      jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif',
+      webp: 'image/webp', svg: 'image/svg+xml', bmp: 'image/bmp',
+      tiff: 'image/tiff', tif: 'image/tiff', avif: 'image/avif',
+      heic: 'image/heic', heif: 'image/heif',
+    };
+    const ext = fileName.split('.').pop()?.toLowerCase();
+    const resolvedType = contentType || EXT_MIME[ext] || 'application/octet-stream';
+
     const { error } = await supabase.storage
       .from('menu-images')
-      .upload(safeName, buffer, { contentType: contentType || 'image/jpeg', upsert: true });
+      .upload(safeName, buffer, { contentType: resolvedType, upsert: true });
     if (error) throw error;
 
     const { data: urlData } = supabase.storage.from('menu-images').getPublicUrl(safeName);

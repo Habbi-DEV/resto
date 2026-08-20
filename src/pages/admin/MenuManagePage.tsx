@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ImagePlus, Pencil, Plus, Trash2 } from 'lucide-react';
 import type { Category, Product } from '../../lib/types';
 import { api } from '../../lib/api';
+import supabase from '../../lib/supabase';
 import { money } from '../../lib/format';
 import Modal from '../../components/ui/Modal';
 import Spinner from '../../components/ui/Spinner';
@@ -139,9 +140,14 @@ export default function MenuManagePage() {
       reader.onload = async () => {
         try {
           const base64 = String(reader.result).split(',')[1];
+          const { data: sessionData } = await supabase.auth.getSession();
+          const token = sessionData.session?.access_token;
           const res = await fetch('/api/upload', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
             body: JSON.stringify({ fileName: file.name, fileBase64: base64, contentType: file.type }),
           });
           const data = await res.json();
@@ -257,7 +263,7 @@ export default function MenuManagePage() {
               )}
               <label className="cursor-pointer rounded-xl border border-zinc-200 px-3 py-2 text-xs font-bold text-zinc-600 hover:bg-zinc-50">
                 {uploading ? 'Uploading…' : 'Upload image'}
-                <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && uploadImage(e.target.files[0])} />
+                <input type="file" accept="image/*,.heic,.heif,.avif,.svg,.webp,.gif,.bmp,.tiff" className="hidden" onChange={(e) => e.target.files?.[0] && uploadImage(e.target.files[0])} />
               </label>
             </div>
           </div>
