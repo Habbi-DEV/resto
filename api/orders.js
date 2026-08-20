@@ -131,17 +131,37 @@ export default async function handler(req, res) {
       if (iErr) throw iErr;
 
       // Stock decrement + audit trail (mirrors the SQL trigger in schema.sql)
-      for (const r of rows) {
-        const p = byId[r.product_id];
-        const newStock = Math.max(0, (p.stock ?? 0) - r.quantity);
-        await supabase.from('products').update({ stock: newStock }).eq('id', p.id);
-        await supabase.from('inventory_logs').insert({
-          product_id: p.id,
-          change: -r.quantity,
-          reason: 'sale',
-          notes: `Sold in order #${order.id + 1000}`,
-        });
-      }
+      //
+      // PERFORMANCE FIX: this used to run as a sequential for-loop — 2
+      // awaited round-trips per cart line item (update, then insert), one
+      // after another. For an order with 3 items that's 6 chained network
+      // calls before the response could return. Under 100 concurrent users
+      // this queued up and pushed P95 latency to ~20s.
+      //
+      // Now all the stock updates + inventory log inserts for this order are
+      // fired in parallel with Promise.all, so an order's total extra work is
+      // ~1 round-trip instead of 2*N chained ones.
+      await Promise.all(
+        rows.flatMap((r) => {
+          const p = byId[r.product_id];
+          const newStock = Math.max(0, (p.stock ?? 0) - r.quantity);
+          return [
+            supabase.from('products').update({ stock: newStock }).eq('id', p.id),
+            supabase.from('inventory_logs').insert({
+              product_id: p.id,
+              change: -r.quantity,
+              reason: 'sale',
+              notes: `Sold in order #${order.id + 1000}`,
+            }),
+          ];
+        })
+      ).catch((err) => {
+        // The order and its items are already committed at this point — a
+        // stock/log side-effect failure shouldn't fail the whole request and
+        // make the customer think their order wasn't placed. Log it instead
+        // so it can be investigated/reconciled.
+        console.error(`Stock/inventory update failed for order #${order.id}:`, err);
+      });
 
       // Dine-in seats the table
       if (order_type === 'dine_in') {
