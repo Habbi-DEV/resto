@@ -30,7 +30,10 @@ export function printInvoice(order: Order): void {
     order.order_type === 'dine_in'
       ? `Table ${order.table_number ?? '—'}`
       : order.order_type === 'delivery'
-      ? [order.customer_name, order.customer_phone, order.delivery_address].filter(Boolean).map(escapeHtml).join('<br/>')
+      ? [order.customer_name, order.customer_phone, order.delivery_address]
+          .filter((v): v is string => Boolean(v))
+          .map(escapeHtml)
+          .join('<br/>')
       : 'Pickup at counter';
 
   const itemsHtml = (order.items ?? [])
