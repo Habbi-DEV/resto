@@ -3,12 +3,12 @@ import { Check, Minus, Plus, Printer, Search, Trash2 } from 'lucide-react';
 import type { Category, Order, Product, RestaurantTable } from '../../lib/types';
 import { api } from '../../lib/api';
 import { money, orderNumber, timeAgo } from '../../lib/format';
+import { printInvoice } from '../../lib/invoice';
 import { useCartStore, selectSubtotal } from '../../stores/cartStore';
 import useLiveOrders from '../../hooks/useLiveOrders';
 import StatusBadge from '../../components/StatusBadge';
 import { OrderTypeTag, orderContext } from '../../components/OrderTypeTag';
 import Spinner from '../../components/ui/Spinner';
-import InvoiceModal from '../../components/InvoiceModal';
 import type { OrderType } from '../../lib/types';
 
 const TAX_RATE = 0.10;
@@ -44,8 +44,6 @@ export default function RegisterPage() {
   const [notes, setNotes] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [placing, setPlacing] = useState(false);
-  const [lastOrder, setLastOrder] = useState<Order | null>(null);
-  const [printOrder, setPrintOrder] = useState<Order | null>(null);
 
   const loadAll = () => {
     Promise.all([
@@ -95,12 +93,11 @@ export default function RegisterPage() {
           delivery_address: orderType === 'delivery' ? address : undefined,
           notes: notes || undefined,
           payment_method: 'card',
-          items: lines.map((l) => ({ product_id: l.product.id, quantity: l.qty })),
+          items: lines.map((l) => ({ product_id: l.product.id, quantity: l.qty, sauce_ids: l.sauces.map((s) => s.id) })),
         }),
       });
       clear();
       setTableNumber(null); setName(''); setPhone(''); setAddress(''); setNotes('');
-      setLastOrder(order);
       setFlash(`Order ${orderNumber(order.id)} sent to kitchen ✅`);
       setTimeout(() => setFlash(''), 3500);
       setTab('live');
@@ -187,19 +184,7 @@ export default function RegisterPage() {
           ))}
         </div>
 
-        {flash && (
-          <div className="mx-3 mt-3 flex items-center justify-between gap-2 rounded-xl bg-brand-50 px-3 py-2 text-xs font-bold text-brand-700">
-            <span>{flash}</span>
-            {lastOrder && (
-              <button
-                onClick={() => setPrintOrder(lastOrder)}
-                className="flex shrink-0 items-center gap-1 rounded-lg bg-white px-2 py-1 text-[11px] text-brand-600 shadow-sm hover:bg-brand-100"
-              >
-                <Printer size={12} /> Print
-              </button>
-            )}
-          </div>
-        )}
+        {flash && <div className="mx-3 mt-3 rounded-xl bg-brand-50 px-3 py-2 text-xs font-bold text-brand-700">{flash}</div>}
 
         {tab === 'ticket' ? (
           <div className="thin-scroll flex flex-1 flex-col overflow-y-auto p-4">
@@ -253,15 +238,15 @@ export default function RegisterPage() {
               ) : (
                 <ul className="space-y-2">
                   {lines.map((l) => (
-                    <li key={l.product.id} className="flex items-center gap-2 rounded-xl bg-zinc-50 p-2">
+                    <li key={l.key} className="flex items-center gap-2 rounded-xl bg-zinc-50 p-2">
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-xs font-semibold text-zinc-900">{l.product.name}</p>
                         <p className="text-[11px] text-zinc-400">{money(l.product.price)} × {l.qty}</p>
                       </div>
-                      <button onClick={() => dec(l.product.id)} className="flex h-6 w-6 items-center justify-center rounded-full bg-white shadow-sm"><Minus size={11} /></button>
+                      <button onClick={() => dec(l.key)} className="flex h-6 w-6 items-center justify-center rounded-full bg-white shadow-sm"><Minus size={11} /></button>
                       <span className="w-4 text-center text-xs font-bold">{l.qty}</span>
-                      <button onClick={() => inc(l.product.id)} className="flex h-6 w-6 items-center justify-center rounded-full bg-white shadow-sm"><Plus size={11} /></button>
-                      <button onClick={() => remove(l.product.id)} className="text-zinc-300 hover:text-red-500"><Trash2 size={14} /></button>
+                      <button onClick={() => inc(l.key)} className="flex h-6 w-6 items-center justify-center rounded-full bg-white shadow-sm"><Plus size={11} /></button>
+                      <button onClick={() => remove(l.key)} className="text-zinc-300 hover:text-red-500"><Trash2 size={14} /></button>
                     </li>
                   ))}
                 </ul>
@@ -304,10 +289,10 @@ export default function RegisterPage() {
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-bold">{money(o.total)}</span>
                         <button
-                          onClick={() => setPrintOrder(o)}
-                          className="rounded-full p-1 text-zinc-300 transition hover:bg-zinc-100 hover:text-zinc-600"
-                          aria-label={`Print invoice for order ${orderNumber(o.id)}`}
+                          onClick={() => printInvoice(o)}
                           title="Print invoice"
+                          aria-label="Print invoice"
+                          className="flex h-6 w-6 items-center justify-center rounded-lg text-zinc-400 hover:bg-zinc-50 hover:text-brand-600"
                         >
                           <Printer size={13} />
                         </button>
@@ -324,8 +309,6 @@ export default function RegisterPage() {
           </div>
         )}
       </aside>
-
-      <InvoiceModal order={printOrder} onClose={() => setPrintOrder(null)} />
     </div>
   );
 }

@@ -22,42 +22,25 @@ export default async function handler(req, res) {
 
   try {
     if (req.method === 'GET') {
-      let q = supabase.from('products').select('*').order('category_id').order('name');
-      if (req.query.category_id) q = q.eq('category_id', Number(req.query.category_id));
-      if (req.query.available === '1') q = q.eq('is_available', true);
+      let q = supabase.from('sauces').select('*').order('sort_order').order('name');
+      // The public e-menu only ever asks for active=1; staff screens fetch
+      // everything (including hidden sauces) so they can toggle them back on.
+      if (req.query.active === '1') q = q.eq('is_active', true);
       const { data, error } = await q;
       if (error) throw error;
-
-      // Attach each product's extra gallery photos in one round-trip so the
-      // e-menu / register / admin never have to N+1 fetch product_images.
-      const ids = (data || []).map((p) => p.id);
-      let images = [];
-      if (ids.length) {
-        const { data: imgs } = await supabase
-          .from('product_images').select('*').in('product_id', ids).order('sort_order');
-        images = imgs || [];
-      }
-      const byProduct = {};
-      for (const img of images) (byProduct[img.product_id] ||= []).push(img);
-      return res.status(200).json((data || []).map((p) => ({ ...p, images: byProduct[p.id] || [] })));
+      return res.status(200).json(data);
     }
 
     if (req.method === 'POST') {
       if (!(await requireStaff(req, res))) return;
-      const { name, description, price, category_id, image_url, stock, is_available } = req.body || {};
-      if (!name || price == null || isNaN(Number(price))) {
-        return res.status(400).json({ error: 'Product name and a valid price are required' });
-      }
+      const { name, price, sort_order } = req.body || {};
+      if (!name || !String(name).trim()) return res.status(400).json({ error: 'Sauce name is required' });
       const { data, error } = await supabase
-        .from('products')
+        .from('sauces')
         .insert({
           name: String(name).trim(),
-          description: description || '',
-          price: Number(price),
-          category_id: category_id ? Number(category_id) : null,
-          image_url: image_url || '',
-          stock: Number(stock) || 0,
-          is_available: is_available !== false,
+          price: Number(price) || 0,
+          sort_order: Number(sort_order) || 0,
         })
         .select()
         .single();
@@ -70,9 +53,8 @@ export default async function handler(req, res) {
       const { id, ...fields } = req.body || {};
       if (!id) return res.status(400).json({ error: 'id is required' });
       if (fields.price != null) fields.price = Number(fields.price);
-      if (fields.stock != null) fields.stock = Number(fields.stock);
       const { data, error } = await supabase
-        .from('products')
+        .from('sauces')
         .update(fields)
         .eq('id', Number(id))
         .select()
@@ -84,14 +66,14 @@ export default async function handler(req, res) {
     if (req.method === 'DELETE') {
       if (!(await requireStaff(req, res))) return;
       const { id } = req.body || {};
-      const { error } = await supabase.from('products').delete().eq('id', Number(id));
+      const { error } = await supabase.from('sauces').delete().eq('id', Number(id));
       if (error) throw error;
       return res.status(200).json({ ok: true });
     }
 
     res.status(405).json({ error: 'Method not allowed' });
   } catch (err) {
-    console.error('products API error:', err);
+    console.error('sauces API error:', err);
     res.status(500).json({ error: err.message });
   }
 }

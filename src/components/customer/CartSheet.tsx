@@ -88,7 +88,7 @@ export default function CartSheet({ open, onClose, onPlaced }: Props) {
           delivery_address: orderType === 'delivery' ? address : undefined,
           notes: notes || undefined,
           payment_method: payment,
-          items: lines.map((l) => ({ product_id: l.product.id, quantity: l.qty })),
+          items: lines.map((l) => ({ product_id: l.product.id, quantity: l.qty, sauce_ids: l.sauces.map((s) => s.id) })),
         }),
       });
       clear();
@@ -133,21 +133,27 @@ export default function CartSheet({ open, onClose, onPlaced }: Props) {
                 <p className="py-10 text-center text-sm text-zinc-400">Your cart is empty. Add something tasty! 🍔</p>
               ) : step === 'cart' ? (
                 <ul className="space-y-3">
-                  {lines.map((l) => (
-                    <li key={l.product.id} className="flex items-center gap-3 rounded-2xl bg-zinc-50 p-2.5">
-                      <img src={l.product.image_url} alt="" className="h-14 w-14 rounded-xl object-cover" />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-semibold text-zinc-900">{l.product.name}</p>
-                        <p className="text-sm font-bold text-burnt">{money(l.product.price * l.qty)}</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button onClick={() => dec(l.product.id)} className="flex h-7 w-7 items-center justify-center rounded-full bg-white shadow-sm" aria-label="Decrease"><Minus size={13} /></button>
-                        <span className="w-5 text-center text-sm font-bold">{l.qty}</span>
-                        <button onClick={() => inc(l.product.id)} className="flex h-7 w-7 items-center justify-center rounded-full bg-white shadow-sm" aria-label="Increase"><Plus size={13} /></button>
-                        <button onClick={() => remove(l.product.id)} className="ml-1 text-zinc-300 hover:text-red-500" aria-label="Remove"><Trash2 size={16} /></button>
-                      </div>
-                    </li>
-                  ))}
+                  {lines.map((l) => {
+                    const unitPrice = l.product.price + l.sauces.reduce((n, s) => n + s.price, 0);
+                    return (
+                      <li key={l.key} className="flex items-center gap-3 rounded-2xl bg-zinc-50 p-2.5">
+                        <img src={l.product.image_url} alt="" className="h-14 w-14 rounded-xl object-cover" />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold text-zinc-900">{l.product.name}</p>
+                          {l.sauces.length > 0 && (
+                            <p className="truncate text-[11px] text-zinc-400">+ {l.sauces.map((s) => s.name).join(', ')}</p>
+                          )}
+                          <p className="text-sm font-bold text-burnt">{money(unitPrice * l.qty)}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button onClick={() => dec(l.key)} className="flex h-7 w-7 items-center justify-center rounded-full bg-white shadow-sm" aria-label="Decrease"><Minus size={13} /></button>
+                          <span className="w-5 text-center text-sm font-bold">{l.qty}</span>
+                          <button onClick={() => inc(l.key)} className="flex h-7 w-7 items-center justify-center rounded-full bg-white shadow-sm" aria-label="Increase"><Plus size={13} /></button>
+                          <button onClick={() => remove(l.key)} className="ml-1 text-zinc-300 hover:text-red-500" aria-label="Remove"><Trash2 size={16} /></button>
+                        </div>
+                      </li>
+                    );
+                  })}
                 </ul>
               ) : (
                 <div className="space-y-5">

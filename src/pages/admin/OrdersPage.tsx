@@ -4,9 +4,9 @@ import useLiveOrders from '../../hooks/useLiveOrders';
 import StatusBadge from '../../components/StatusBadge';
 import { OrderTypeTag } from '../../components/OrderTypeTag';
 import Spinner from '../../components/ui/Spinner';
-import InvoiceModal from '../../components/InvoiceModal';
 import { api } from '../../lib/api';
 import { money, orderNumber, timeAgo } from '../../lib/format';
+import { printInvoice } from '../../lib/invoice';
 import type { Order, OrderStatus, OrderType } from '../../lib/types';
 
 const STATUS_FILTERS: { value: OrderStatus | 'all'; label: string }[] = [
@@ -46,7 +46,6 @@ export default function OrdersPage() {
   const [statusFilter, setStatusFilter] = useState<OrderStatus | 'all'>('all');
   const [typeFilter, setTypeFilter] = useState<OrderType | 'all'>('all');
   const [busyId, setBusyId] = useState<number | null>(null);
-  const [printOrder, setPrintOrder] = useState<Order | null>(null);
 
   const filtered = useMemo(
     () => orders.filter((o) =>
@@ -139,10 +138,15 @@ export default function OrdersPage() {
 
                 <div className="mt-3 flex-1 rounded-xl bg-zinc-50 p-2.5 text-xs">
                   {(o.items && o.items.length > 0 ? o.items : []).slice(0, 4).map((it) => (
-                    <p key={it.id} className="flex justify-between py-0.5 text-zinc-600">
-                      <span className="truncate">{it.quantity}× {it.product_name}</span>
-                      <span className="ml-2 shrink-0 text-zinc-400">{money(it.line_total)}</span>
-                    </p>
+                    <div key={it.id} className="py-0.5">
+                      <p className="flex justify-between text-zinc-600">
+                        <span className="truncate">{it.quantity}× {it.product_name}</span>
+                        <span className="ml-2 shrink-0 text-zinc-400">{money(it.line_total)}</span>
+                      </p>
+                      {it.sauces && it.sauces.length > 0 && (
+                        <p className="truncate pl-3 text-[10px] text-zinc-400">+ {it.sauces.map((s) => s.name).join(', ')}</p>
+                      )}
+                    </div>
                   ))}
                   {(!o.items || o.items.length === 0) && <p className="text-zinc-400">No items recorded</p>}
                   {(o.items?.length ?? 0) > 4 && <p className="pt-0.5 text-[10px] text-zinc-400">+{o.items!.length - 4} more</p>}
@@ -154,10 +158,10 @@ export default function OrdersPage() {
                   <span className="font-display text-base font-bold text-zinc-900">{money(o.total)}</span>
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => setPrintOrder(o)}
-                      className="rounded-full p-1.5 text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700"
-                      aria-label={`Print invoice for order ${orderNumber(o.id)}`}
+                      onClick={() => printInvoice(o)}
                       title="Print invoice"
+                      aria-label="Print invoice"
+                      className="flex h-7 w-7 items-center justify-center rounded-lg text-zinc-400 hover:bg-zinc-50 hover:text-brand-600"
                     >
                       <Printer size={15} />
                     </button>
@@ -205,8 +209,6 @@ export default function OrdersPage() {
           })}
         </div>
       )}
-
-      <InvoiceModal order={printOrder} onClose={() => setPrintOrder(null)} />
     </div>
   );
 }

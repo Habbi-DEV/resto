@@ -394,6 +394,54 @@ alter publication supabase_realtime add table public.order_items;
 alter table public.orders      replica identity full;
 alter table public.order_items replica identity full;
 
+-- ----------------------------------------------------------------------------
+-- 12. PRODUCT IMAGES — extra gallery photos in addition to products.image_url
+-- ----------------------------------------------------------------------------
+create table public.product_images (
+  id         bigint generated always as identity primary key,
+  product_id bigint not null references public.products (id) on delete cascade,
+  url        text not null,
+  sort_order integer not null default 0,
+  created_at timestamptz not null default now()
+);
+comment on table public.product_images is 'Extra gallery photos for a product, in addition to the cover image_url.';
+
+create index idx_product_images_product on public.product_images (product_id, sort_order);
+
+alter table public.product_images enable row level security;
+create policy "product_images_public_read" on public.product_images for select using (true);
+create policy "product_images_staff_write" on public.product_images
+  for all using (public.is_staff()) with check (public.is_staff());
+
+-- ----------------------------------------------------------------------------
+-- 13. SAUCES — optional add-ons; is_active=false hides one without deleting it
+-- ----------------------------------------------------------------------------
+create table public.sauces (
+  id         bigint generated always as identity primary key,
+  name       text not null unique,
+  price      numeric(10,2) not null default 0 check (price >= 0),
+  is_active  boolean not null default true,
+  sort_order integer not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+comment on table public.sauces is 'Sauces / extras selectable on a product. Hidden (is_active=false) ones stay out of the e-menu.';
+
+create trigger trg_sauces_updated_at before update on public.sauces
+  for each row execute function public.set_updated_at();
+
+alter table public.sauces enable row level security;
+create policy "sauces_public_read" on public.sauces for select using (true);
+create policy "sauces_staff_write" on public.sauces
+  for all using (public.is_staff()) with check (public.is_staff());
+
+-- ----------------------------------------------------------------------------
+-- 14. ORDER ITEM SAUCES SNAPSHOT — immutable, same spirit as product_name
+-- ----------------------------------------------------------------------------
+alter table public.order_items
+  add column sauces jsonb not null default '[]'::jsonb;
+comment on column public.order_items.sauces is 'Snapshot of chosen sauces at order time: [{"name": "...", "price": 0.50}, ...]';
+
 commit;
 
 -- ============================================================================

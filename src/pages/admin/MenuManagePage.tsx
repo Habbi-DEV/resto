@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { ImagePlus, Pencil, Plus, Trash2 } from 'lucide-react';
-import type { Category, Product } from '../../lib/types';
+import { ImagePlus, Pencil, Plus, Trash2, X } from 'lucide-react';
+import type { Category, Product, ProductImage, Sauce } from '../../lib/types';
 import { api } from '../../lib/api';
 import supabase from '../../lib/supabase';
 import { money } from '../../lib/format';
@@ -20,9 +20,12 @@ const EMPTY_FORM = {
 export default function MenuManagePage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [sauces, setSauces] = useState<Sauce[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [newCat, setNewCat] = useState({ name: '', icon: '🍽️' });
+  const [newSauce, setNewSauce] = useState({ name: '', price: '' });
+  const [savingSauce, setSavingSauce] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
@@ -30,14 +33,24 @@ export default function MenuManagePage() {
   const [error, setError] = useState('');
   const [uploading, setUploading] = useState(false);
 
+  // Gallery photos (in addition to the single cover `image_url`). Saved
+  // products keep theirs in `gallery`; a brand-new product has nowhere to
+  // attach photos to yet, so uploads sit in `pendingGallery` (URLs already
+  // in storage) until `save()` creates the product and links them.
+  const [gallery, setGallery] = useState<ProductImage[]>([]);
+  const [pendingGallery, setPendingGallery] = useState<string[]>([]);
+  const [galleryUploading, setGalleryUploading] = useState(false);
+
   const load = () => {
     Promise.all([
       fetch('/api/categories').then((r) => r.json()),
       fetch('/api/products').then((r) => r.json()),
+      fetch('/api/sauces').then((r) => r.json()),
     ])
-      .then(([c, p]) => {
+      .then(([c, p, s]) => {
         setCategories(Array.isArray(c) ? c : []);
         setProducts(Array.isArray(p) ? p : []);
+        setSauces(Array.isArray(s) ? s : []);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -51,6 +64,8 @@ export default function MenuManagePage() {
     setEditing(null);
     setForm(EMPTY_FORM);
     setError('');
+    setGallery([]);
+    setPendingGallery([]);
     setModalOpen(true);
   };
 
@@ -66,6 +81,8 @@ export default function MenuManagePage() {
       is_available: p.is_available,
     });
     setError('');
+    setGallery(p.images ?? []);
+    setPendingGallery([]);
     setModalOpen(true);
   };
 
@@ -89,7 +106,15 @@ export default function MenuManagePage() {
       if (editing) {
         await api('/api/products', { method: 'PUT', body: JSON.stringify({ id: editing.id, ...payload }) });
       } else {
-        await api('/api/products', { method: 'POST', body: JSON.stringify(payload) });
+        const created = await api<Product>('/api/products', { method: 'POST', body: JSON.stringify(payload) });
+        // Flush any gallery photos uploaded before the product existed.
+        if (pendingGallery.length) {
+          await Promise.all(
+            pendingGallery.map((url) =>
+              api('/api/product-images', { method: 'POST', body: JSON.stringify({ product_id: created.id, url }) }),
+            ),
+          ).catch(console.error);
+        }
       }
       setModalOpen(false);
       load();
@@ -165,6 +190,81 @@ export default function MenuManagePage() {
     }
   };
 
+  /** Uploads to storage first, then either attaches to the saved product or
+   *  queues the URL for a not-yet-created one (see `pendingGallery`). */
+  const addGalleryFiles = async (files: FileList) => {
+    setGalleryUploading(true);
+    setError('');
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      for (const file of Array.from(files)) {
+        const base64: string = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result).split(',')[1]);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+        const res = await fetch('/api/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+          body: JSON.stringify({ fileName: file.name, fileBase64: base64, contentType: file.type }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Upload failed');
+
+        if (editing) {
+          const saved = await api<ProductImage>('/api/product-images', {
+            method: 'POST',
+            body: JSON.stringify({ product_id: editing.id, url: data.url }),
+          });
+          setGallery((g) => [...g, saved]);
+        } else {
+          setPendingGallery((g) => [...g, data.url]);
+        }
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Gallery upload failed');
+    } finally {
+      setGalleryUploading(false);
+    }
+  };
+
+  const removeGalleryImage = async (img: ProductImage) => {
+    setGallery((g) => g.filter((x) => x.id !== img.id));
+    await api('/api/product-images', { method: 'DELETE', body: JSON.stringify({ id: img.id }) }).catch(console.error);
+  };
+
+  const removePendingGallery = (url: string) => setPendingGallery((g) => g.filter((u) => u !== url));
+
+  const addSauce = async () => {
+    if (!newSauce.name.trim()) return;
+    setSavingSauce(true);
+    try {
+      await api('/api/sauces', {
+        method: 'POST',
+        body: JSON.stringify({ name: newSauce.name.trim(), price: Number(newSauce.price) || 0 }),
+      });
+      setNewSauce({ name: '', price: '' });
+      load();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Could not add sauce');
+    } finally {
+      setSavingSauce(false);
+    }
+  };
+
+  const toggleSauceActive = async (s: Sauce) => {
+    await api('/api/sauces', { method: 'PUT', body: JSON.stringify({ id: s.id, is_active: !s.is_active }) }).catch(console.error);
+    load();
+  };
+
+  const removeSauce = async (s: Sauce) => {
+    if (!confirm(`Delete sauce "${s.name}"?`)) return;
+    await api('/api/sauces', { method: 'DELETE', body: JSON.stringify({ id: s.id }) }).catch(console.error);
+    load();
+  };
+
   if (loading) return <Spinner label="Loading the menu…" />;
 
   return (
@@ -195,6 +295,29 @@ export default function MenuManagePage() {
             <input value={newCat.name} onChange={(e) => setNewCat({ ...newCat, name: e.target.value })} placeholder="New category…" className="w-36 rounded-lg border border-zinc-200 px-3 py-1.5 text-xs outline-none focus:border-brand-400" />
             <button onClick={addCategory} className="rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-bold text-white hover:bg-zinc-800">Add</button>
           </div>
+        </div>
+      </div>
+
+      {/* sauces */}
+      <div className="mb-6 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-zinc-100">
+        <h2 className="mb-1 font-display text-sm font-bold text-zinc-900">Sauces</h2>
+        <p className="mb-3 text-xs text-zinc-400">Optional add-ons customers can pick when ordering. Hide one to pull it off the e-menu without deleting it.</p>
+        <div className="flex flex-wrap items-center gap-2">
+          {sauces.map((s) => (
+            <div key={s.id} className={`flex items-center gap-2 rounded-full border py-1.5 pl-3 pr-1.5 text-xs font-semibold ${s.is_active ? 'border-zinc-200 bg-white text-zinc-700' : 'border-dashed border-zinc-200 bg-zinc-50 text-zinc-400'}`}>
+              <span>{s.name}{s.price > 0 ? ` (+${money(s.price)})` : ''}</span>
+              <button onClick={() => toggleSauceActive(s)} title={s.is_active ? 'Hide from e-menu' : 'Show on e-menu'} className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${s.is_active ? 'bg-brand-50 text-brand-700' : 'bg-zinc-100 text-zinc-400'}`}>
+                {s.is_active ? 'Visible' : 'Hidden'}
+              </button>
+              <button onClick={() => removeSauce(s)} className="text-zinc-300 hover:text-red-500"><Trash2 size={12} /></button>
+            </div>
+          ))}
+          {sauces.length === 0 && <p className="text-xs text-zinc-400">No sauces yet — add your first one.</p>}
+        </div>
+        <div className="mt-3 flex items-center gap-1.5">
+          <input value={newSauce.name} onChange={(e) => setNewSauce({ ...newSauce, name: e.target.value })} placeholder="New sauce…" className="w-40 rounded-lg border border-zinc-200 px-3 py-1.5 text-xs outline-none focus:border-brand-400" />
+          <input value={newSauce.price} onChange={(e) => setNewSauce({ ...newSauce, price: e.target.value })} type="number" step="0.10" min="0" placeholder="Extra €" className="w-24 rounded-lg border border-zinc-200 px-3 py-1.5 text-xs outline-none focus:border-brand-400" />
+          <button onClick={addSauce} disabled={savingSauce} className="rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-bold text-white hover:bg-zinc-800 disabled:opacity-60">Add</button>
         </div>
       </div>
 
@@ -266,6 +389,48 @@ export default function MenuManagePage() {
                 <input type="file" accept="image/*,.heic,.heif,.avif,.svg,.webp,.gif,.bmp,.tiff" className="hidden" onChange={(e) => e.target.files?.[0] && uploadImage(e.target.files[0])} />
               </label>
             </div>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-[10px] font-bold uppercase text-zinc-400">Gallery — additional photos</label>
+            <div className="flex flex-wrap items-center gap-2">
+              {gallery.map((img) => (
+                <div key={img.id} className="group relative h-16 w-16 shrink-0">
+                  <img src={img.url} alt="" className="h-16 w-16 rounded-xl object-cover ring-1 ring-zinc-200" />
+                  <button
+                    onClick={() => removeGalleryImage(img)}
+                    className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-zinc-900 text-white shadow"
+                    aria-label="Remove photo"
+                  >
+                    <X size={11} />
+                  </button>
+                </div>
+              ))}
+              {pendingGallery.map((url) => (
+                <div key={url} className="group relative h-16 w-16 shrink-0">
+                  <img src={url} alt="" className="h-16 w-16 rounded-xl object-cover ring-1 ring-zinc-200" />
+                  <button
+                    onClick={() => removePendingGallery(url)}
+                    className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-zinc-900 text-white shadow"
+                    aria-label="Remove photo"
+                  >
+                    <X size={11} />
+                  </button>
+                </div>
+              ))}
+              <label className="flex h-16 w-16 shrink-0 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-xl border border-dashed border-zinc-300 text-zinc-400 hover:bg-zinc-50">
+                <ImagePlus size={16} />
+                <span className="text-[9px] font-bold">{galleryUploading ? '…' : 'Add'}</span>
+                <input
+                  type="file"
+                  accept="image/*,.heic,.heif,.avif,.svg,.webp,.gif,.bmp,.tiff"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => e.target.files?.length && addGalleryFiles(e.target.files)}
+                />
+              </label>
+            </div>
+            <p className="mt-1.5 text-[10px] text-zinc-400">Shown as a swipeable gallery on the product detail sheet, in addition to the cover photo above.</p>
           </div>
 
           <label className="flex items-center gap-2 text-sm font-semibold text-zinc-700">

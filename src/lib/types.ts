@@ -19,6 +19,13 @@ export interface Category {
   is_active: boolean;
 }
 
+export interface ProductImage {
+  id: number;
+  product_id: number;
+  url: string;
+  sort_order: number;
+}
+
 export interface Product {
   id: number;
   category_id: number | null;
@@ -28,6 +35,22 @@ export interface Product {
   image_url: string;
   is_available: boolean;
   stock: number;
+  /** Extra gallery photos in addition to image_url (the cover photo). */
+  images?: ProductImage[];
+}
+
+export interface Sauce {
+  id: number;
+  name: string;
+  price: number;
+  is_active: boolean;
+  sort_order: number;
+}
+
+/** Snapshot of a sauce as recorded on an order_item — never a live FK join. */
+export interface OrderItemSauce {
+  name: string;
+  price: number;
 }
 
 export interface RestaurantTable {
@@ -45,6 +68,7 @@ export interface OrderItem {
   unit_price: number;
   quantity: number;
   line_total: number;
+  sauces?: OrderItemSauce[];
 }
 
 export interface Order {

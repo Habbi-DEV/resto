@@ -110,6 +110,19 @@ export default async function handler(req, res) {
       if (pErr) throw pErr;
       const byId = Object.fromEntries((products || []).map((p) => [p.id, p]));
 
+      // Sauces are optional add-ons on a line item. Only ACTIVE sauces count
+      // toward the price/snapshot — if one was hidden between the customer
+      // adding it to their cart and checking out, it's silently dropped
+      // rather than failing the whole order.
+      const sauceIds = [...new Set(items.flatMap((i) => (Array.isArray(i.sauce_ids) ? i.sauce_ids : []).map(Number)))];
+      let sauceById = {};
+      if (sauceIds.length) {
+        const { data: sauces, error: sErr } = await supabase
+          .from('sauces').select('*').in('id', sauceIds).eq('is_active', true);
+        if (sErr) throw sErr;
+        sauceById = Object.fromEntries((sauces || []).map((s) => [s.id, s]));
+      }
+
       const rows = [];
       let subtotal = 0;
       for (const it of items) {
@@ -123,11 +136,22 @@ export default async function handler(req, res) {
         if ((p.stock ?? 0) < quantity) {
           return res.status(400).json({ error: `Not enough stock for "${p.name}" (${p.stock ?? 0} left)` });
         }
-        const line_total = Math.round(p.price * quantity * 100) / 100;
+
+        const chosenSauces = (Array.isArray(it.sauce_ids) ? it.sauce_ids : [])
+          .map((id) => sauceById[Number(id)])
+          .filter(Boolean)
+          .map((s) => ({ name: s.name, price: Number(s.price) }));
+        const sauceTotal = chosenSauces.reduce((n, s) => n + s.price, 0);
+        const unit_price = Math.round((p.price + sauceTotal) * 100) / 100;
+
+        const line_total = Math.round(unit_price * quantity * 100) / 100;
         subtotal += line_total;
         // line_total is a GENERATED ALWAYS column in the DB (unit_price * quantity),
         // so it must NOT be included in the insert — Postgres computes it itself.
-        rows.push({ product_id: p.id, product_name: p.name, unit_price: p.price, quantity });
+        // unit_price already folds in the chosen sauces' price so the generated
+        // line_total (and every downstream total) stays correct without any
+        // extra math elsewhere.
+        rows.push({ product_id: p.id, product_name: p.name, unit_price, quantity, sauces: chosenSauces });
       }
       subtotal = Math.round(subtotal * 100) / 100;
       const tax_amount = Math.round(subtotal * TAX_RATE * 100) / 100;

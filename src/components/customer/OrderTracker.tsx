@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { CheckCircle2, XCircle } from 'lucide-react';
+import { CheckCircle2, Printer, XCircle } from 'lucide-react';
 import type { Order, OrderStatus } from '../../lib/types';
 import { orderNumber } from '../../lib/format';
+import { printInvoice } from '../../lib/invoice';
 
 const STEPS: OrderStatus[] = ['pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery', 'completed'];
 
@@ -108,8 +109,14 @@ export default function OrderTracker({ order: initial, onClose }: Props) {
         )}
 
         <button
+          onClick={() => printInvoice(order)}
+          className="mt-8 flex w-full items-center justify-center gap-2 rounded-full border-2 border-zinc-200 py-3.5 font-display text-[15px] font-bold text-zinc-700 transition hover:bg-zinc-50 active:scale-[0.98]"
+        >
+          <Printer size={17} /> Print receipt
+        </button>
+        <button
           onClick={onClose}
-          className="mt-8 w-full rounded-full bg-zinc-900 py-3.5 font-display text-[15px] font-bold text-white transition hover:bg-zinc-800 active:scale-[0.98]"
+          className="mt-3 w-full rounded-full bg-zinc-900 py-3.5 font-display text-[15px] font-bold text-white transition hover:bg-zinc-800 active:scale-[0.98]"
         >
           Back to menu
         </button>
