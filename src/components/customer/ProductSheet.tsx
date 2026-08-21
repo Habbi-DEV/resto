@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Minus, Plus, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Minus, Plus, X } from 'lucide-react';
 import type { Product, Sauce } from '../../lib/types';
 import { money } from '../../lib/format';
 
@@ -63,6 +63,24 @@ export default function ProductSheet({ product, onClose, onAdd }: Props) {
               >
                 <X size={18} />
               </button>
+              {photos.length > 1 && (
+                <>
+                  <button
+                    onClick={() => setPhotoIdx((i) => (i - 1 + photos.length) % photos.length)}
+                    aria-label="Previous photo"
+                    className="absolute left-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-zinc-700 shadow-sm backdrop-blur-sm transition hover:bg-white active:scale-90"
+                  >
+                    <ChevronLeft size={16} strokeWidth={2.5} />
+                  </button>
+                  <button
+                    onClick={() => setPhotoIdx((i) => (i + 1) % photos.length)}
+                    aria-label="Next photo"
+                    className="absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-zinc-700 shadow-sm backdrop-blur-sm transition hover:bg-white active:scale-90"
+                  >
+                    <ChevronRight size={16} strokeWidth={2.5} />
+                  </button>
+                </>
+              )}
               {photos.length > 1 && (
                 <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 gap-1.5">
                   {photos.map((_, i) => (
