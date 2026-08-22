@@ -107,6 +107,28 @@ export interface Stats {
   by_type: Record<OrderType, number>;
 }
 
+export type Currency = 'EUR' | 'USD' | 'MAD' | 'DZD';
+
+export interface Settings {
+  id: number;
+  restaurant_name: string;
+  logo_url: string;
+  address: string;
+  phone: string;
+  contact_email: string;
+  opening_hours: string;
+  currency: Currency;
+  tax_rate: number;
+  delivery_fee: number;
+  delivery_min_order: number;
+  payment_cash_enabled: boolean;
+  payment_card_enabled: boolean;
+  new_order_sound_enabled: boolean;
+  low_stock_threshold: number;
+  brand_color: string;
+  updated_at: string;
+}
+
 export const ACTIVE_STATUSES: OrderStatus[] = [
   'pending',
   'confirmed',
