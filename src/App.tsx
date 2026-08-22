@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -11,8 +12,17 @@ import MenuManagePage from './pages/admin/MenuManagePage';
 import TablesPage from './pages/admin/TablesPage';
 import InventoryPage from './pages/admin/InventoryPage';
 import SchemaPage from './pages/admin/SchemaPage';
+import SettingsPage from './pages/admin/SettingsPage';
+import { loadSettings } from './lib/settings';
 
 export default function App() {
+  // Loaded once at the root so money() (used on both the public e-menu and
+  // the admin dashboard) has the real currency as early as possible. Until
+  // this resolves, money() falls back to EUR.
+  useEffect(() => {
+    loadSettings();
+  }, []);
+
   return (
     <AuthProvider>
       <BrowserRouter>
@@ -37,6 +47,7 @@ export default function App() {
             <Route path="tables" element={<TablesPage />} />
             <Route path="inventory" element={<InventoryPage />} />
             <Route path="schema" element={<SchemaPage />} />
+            <Route path="settings" element={<SettingsPage />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />
