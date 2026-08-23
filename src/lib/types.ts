@@ -39,6 +39,11 @@ export interface Product {
   stock: number;
   /** Extra gallery photos in addition to image_url (the cover photo). */
   images?: ProductImage[];
+  /** Supplements the admin picked for this specific product (New/Edit
+   *  product modal) — independent of category, unlike Sauces. May include
+   *  hidden (is_active === false) ones; the customer sheet filters those
+   *  out itself. */
+  supplements?: Supplement[];
 }
 
 export interface Sauce {
@@ -50,8 +55,26 @@ export interface Sauce {
   image_url: string | null;
 }
 
+/** Same shape as Sauce — paid add-ons like double cheese, extra meat, kofta,
+ *  double chicken — but which products offer which supplement is chosen
+ *  per-product by the admin instead of per-category. */
+export interface Supplement {
+  id: number;
+  name: string;
+  price: number;
+  is_active: boolean;
+  sort_order: number;
+  image_url: string | null;
+}
+
 /** Snapshot of a sauce as recorded on an order_item — never a live FK join. */
 export interface OrderItemSauce {
+  name: string;
+  price: number;
+}
+
+/** Snapshot of a supplement as recorded on an order_item — never a live FK join. */
+export interface OrderItemSupplement {
   name: string;
   price: number;
 }
@@ -72,6 +95,7 @@ export interface OrderItem {
   quantity: number;
   line_total: number;
   sauces?: OrderItemSauce[];
+  supplements?: OrderItemSupplement[];
 }
 
 export interface Order {

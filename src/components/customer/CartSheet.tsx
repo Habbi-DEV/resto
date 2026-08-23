@@ -88,7 +88,12 @@ export default function CartSheet({ open, onClose, onPlaced }: Props) {
           delivery_address: orderType === 'delivery' ? address : undefined,
           notes: notes || undefined,
           payment_method: payment,
-          items: lines.map((l) => ({ product_id: l.product.id, quantity: l.qty, sauce_ids: l.sauces.map((s) => s.id) })),
+          items: lines.map((l) => ({
+            product_id: l.product.id,
+            quantity: l.qty,
+            sauce_ids: l.sauces.map((s) => s.id),
+            supplement_ids: l.supplements.map((s) => s.id),
+          })),
         }),
       });
       clear();
@@ -134,14 +139,17 @@ export default function CartSheet({ open, onClose, onPlaced }: Props) {
               ) : step === 'cart' ? (
                 <ul className="space-y-3">
                   {lines.map((l) => {
-                    const unitPrice = l.product.price + l.sauces.reduce((n, s) => n + s.price, 0);
+                    const unitPrice = l.product.price
+                      + l.sauces.reduce((n, s) => n + s.price, 0)
+                      + l.supplements.reduce((n, s) => n + s.price, 0);
+                    const addOnNames = [...l.sauces, ...l.supplements].map((s) => s.name);
                     return (
                       <li key={l.key} className="flex items-center gap-3 rounded-2xl bg-zinc-50 p-2.5">
                         <img src={l.product.image_url} alt="" className="h-14 w-14 rounded-xl object-cover" />
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-semibold text-zinc-900">{l.product.name}</p>
-                          {l.sauces.length > 0 && (
-                            <p className="truncate text-[11px] text-zinc-400">+ {l.sauces.map((s) => s.name).join(', ')}</p>
+                          {addOnNames.length > 0 && (
+                            <p className="truncate text-[11px] text-zinc-400">+ {addOnNames.join(', ')}</p>
                           )}
                           <p className="text-sm font-bold text-burnt">{money(unitPrice * l.qty)}</p>
                         </div>

@@ -38,8 +38,9 @@ export function printInvoice(order: Order): void {
 
   const itemsHtml = (order.items ?? [])
     .map((it) => {
-      const sauces = it.sauces && it.sauces.length
-        ? `<div class="sauces">+ ${it.sauces.map((s) => escapeHtml(s.name) + (s.price > 0 ? ` (${money(s.price)})` : '')).join(', ')}</div>`
+      const addOns = [...(it.sauces ?? []), ...(it.supplements ?? [])];
+      const sauces = addOns.length
+        ? `<div class="sauces">+ ${addOns.map((s) => escapeHtml(s.name) + (s.price > 0 ? ` (${money(s.price)})` : '')).join(', ')}</div>`
         : '';
       return `
         <tr>

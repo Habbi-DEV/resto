@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { ImagePlus, Pencil, Plus, Trash2, X } from 'lucide-react';
-import type { Category, Product, ProductImage, Sauce } from '../../lib/types';
+import { Droplet, ImagePlus, Layers, Pencil, Plus, Trash2, X } from 'lucide-react';
+import type { Category, Product, ProductImage, Sauce, Supplement } from '../../lib/types';
 import { api } from '../../lib/api';
 import supabase from '../../lib/supabase';
 import { money } from '../../lib/format';
@@ -21,12 +21,16 @@ export default function MenuManagePage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [sauces, setSauces] = useState<Sauce[]>([]);
+  const [supplements, setSupplements] = useState<Supplement[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [newCat, setNewCat] = useState({ name: '', icon: '🍽️' });
   const [newSauce, setNewSauce] = useState({ name: '', price: '', image_url: '' });
   const [savingSauce, setSavingSauce] = useState(false);
   const [uploadingSaucePhoto, setUploadingSaucePhoto] = useState<'new' | number | null>(null);
+  const [newSupplement, setNewSupplement] = useState({ name: '', price: '', image_url: '' });
+  const [savingSupplement, setSavingSupplement] = useState(false);
+  const [uploadingSupplementPhoto, setUploadingSupplementPhoto] = useState<'new' | number | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
@@ -42,16 +46,24 @@ export default function MenuManagePage() {
   const [pendingGallery, setPendingGallery] = useState<string[]>([]);
   const [galleryUploading, setGalleryUploading] = useState(false);
 
+  // Which supplements (from the general catalog above) this specific
+  // product offers — set from `product.supplements` when editing, sent
+  // back as `supplement_ids` on save. Unlike sauces, this is a per-product
+  // pick, not category-driven, so it lives on the product form itself.
+  const [selectedSupplementIds, setSelectedSupplementIds] = useState<number[]>([]);
+
   const load = () => {
     Promise.all([
       fetch('/api/categories').then((r) => r.json()),
       fetch('/api/products').then((r) => r.json()),
       fetch('/api/sauces').then((r) => r.json()),
+      fetch('/api/sauces?type=supplement').then((r) => r.json()),
     ])
-      .then(([c, p, s]) => {
+      .then(([c, p, s, sup]) => {
         setCategories(Array.isArray(c) ? c : []);
         setProducts(Array.isArray(p) ? p : []);
         setSauces(Array.isArray(s) ? s : []);
+        setSupplements(Array.isArray(sup) ? sup : []);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -67,6 +79,7 @@ export default function MenuManagePage() {
     setError('');
     setGallery([]);
     setPendingGallery([]);
+    setSelectedSupplementIds([]);
     setModalOpen(true);
   };
 
@@ -84,6 +97,7 @@ export default function MenuManagePage() {
     setError('');
     setGallery(p.images ?? []);
     setPendingGallery([]);
+    setSelectedSupplementIds((p.supplements ?? []).map((s) => s.id));
     setModalOpen(true);
   };
 
@@ -102,6 +116,7 @@ export default function MenuManagePage() {
       image_url: form.image_url,
       stock: Number(form.stock) || 0,
       is_available: form.is_available,
+      supplement_ids: selectedSupplementIds,
     };
     try {
       if (editing) {
@@ -149,6 +164,11 @@ export default function MenuManagePage() {
 
   const toggleCategory = async (c: Category) => {
     await api('/api/categories', { method: 'PUT', body: JSON.stringify({ id: c.id, is_active: !c.is_active }) }).catch(console.error);
+    load();
+  };
+
+  const toggleCategorySauces = async (c: Category) => {
+    await api('/api/categories', { method: 'PUT', body: JSON.stringify({ id: c.id, allows_sauces: !c.allows_sauces }) }).catch(console.error);
     load();
   };
 
@@ -301,6 +321,77 @@ export default function MenuManagePage() {
     load();
   };
 
+  /** Shared with both the "new supplement" form (target 'new') and an
+   *  existing supplement's own photo swatch (target = that supplement's id). */
+  const uploadSupplementPhoto = async (file: File, target: 'new' | number) => {
+    setUploadingSupplementPhoto(target);
+    setError('');
+    try {
+      const base64: string = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result).split(',')[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ fileName: file.name, fileBase64: base64, contentType: file.type }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+
+      if (target === 'new') {
+        setNewSupplement((s) => ({ ...s, image_url: data.url }));
+      } else {
+        await api('/api/sauces', { method: 'PUT', body: JSON.stringify({ id: target, type: 'supplement', image_url: data.url }) });
+        load();
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Supplement photo upload failed');
+    } finally {
+      setUploadingSupplementPhoto(null);
+    }
+  };
+
+  const addSupplement = async () => {
+    if (!newSupplement.name.trim()) return;
+    setSavingSupplement(true);
+    try {
+      await api('/api/sauces', {
+        method: 'POST',
+        body: JSON.stringify({
+          type: 'supplement',
+          name: newSupplement.name.trim(),
+          price: Number(newSupplement.price) || 0,
+          image_url: newSupplement.image_url || null,
+        }),
+      });
+      setNewSupplement({ name: '', price: '', image_url: '' });
+      load();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Could not add supplement');
+    } finally {
+      setSavingSupplement(false);
+    }
+  };
+
+  const toggleSupplementActive = async (s: Supplement) => {
+    await api('/api/sauces', { method: 'PUT', body: JSON.stringify({ id: s.id, type: 'supplement', is_active: !s.is_active }) }).catch(console.error);
+    load();
+  };
+
+  const removeSupplement = async (s: Supplement) => {
+    if (!confirm(`Delete supplement "${s.name}"?`)) return;
+    await api('/api/sauces', { method: 'DELETE', body: JSON.stringify({ id: s.id, type: 'supplement' }) }).catch(console.error);
+    load();
+  };
+
+  const toggleProductSupplement = (id: number) =>
+    setSelectedSupplementIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
+
   if (loading) return <Spinner label="Loading the menu…" />;
 
   return (
@@ -323,6 +414,13 @@ export default function MenuManagePage() {
             <div key={c.id} className={`flex items-center gap-2 rounded-full border py-1.5 pl-3 pr-1.5 text-xs font-semibold ${c.is_active ? 'border-zinc-200 bg-white text-zinc-700' : 'border-dashed border-zinc-200 bg-zinc-50 text-zinc-400'}`}>
               <span>{c.icon} {c.name}</span>
               <button onClick={() => toggleCategory(c)} title={c.is_active ? 'Deactivate' : 'Activate'} className={`h-2 w-2 rounded-full ${c.is_active ? 'bg-brand-500' : 'bg-zinc-300'}`} />
+              <button
+                onClick={() => toggleCategorySauces(c)}
+                title={c.allows_sauces ? 'Sauces offered on these products — click to turn off (e.g. drinks, desserts)' : 'Sauces are hidden for these products — click to turn on'}
+                className={`flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-bold ${c.allows_sauces ? 'bg-brand-50 text-brand-700' : 'bg-zinc-100 text-zinc-400'}`}
+              >
+                <Droplet size={10} />
+              </button>
               <button onClick={() => removeCategory(c)} className="text-zinc-300 hover:text-red-500"><Trash2 size={12} /></button>
             </div>
           ))}
@@ -337,7 +435,7 @@ export default function MenuManagePage() {
       {/* sauces */}
       <div className="mb-6 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-zinc-100">
         <h2 className="mb-1 font-display text-sm font-bold text-zinc-900">Sauces</h2>
-        <p className="mb-3 text-xs text-zinc-400">Optional add-ons customers can pick when ordering, shown as a round photo on the product sheet. Hide one to pull it off the e-menu without deleting it.</p>
+        <p className="mb-3 text-xs text-zinc-400">Optional add-ons shown on the product sheet — but only for categories with the 🥫 toggle on above (turn it off for Drinks, Desserts, etc). Hide a sauce here to pull it off the e-menu without deleting it.</p>
         <div className="flex flex-wrap items-start gap-3">
           {sauces.map((s) => (
             <div key={s.id} className="flex w-20 flex-col items-center gap-1.5 text-center">
@@ -389,6 +487,64 @@ export default function MenuManagePage() {
           <input value={newSauce.name} onChange={(e) => setNewSauce({ ...newSauce, name: e.target.value })} placeholder="New sauce…" className="w-32 rounded-lg border border-zinc-200 px-3 py-1.5 text-xs outline-none focus:border-brand-400" />
           <input value={newSauce.price} onChange={(e) => setNewSauce({ ...newSauce, price: e.target.value })} type="number" step="0.10" min="0" placeholder="Extra €" className="w-20 rounded-lg border border-zinc-200 px-3 py-1.5 text-xs outline-none focus:border-brand-400" />
           <button onClick={addSauce} disabled={savingSauce || uploadingSaucePhoto === 'new'} className="rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-bold text-white hover:bg-zinc-800 disabled:opacity-60">Add</button>
+        </div>
+      </div>
+
+      {/* supplements */}
+      <div className="mb-6 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-zinc-100">
+        <h2 className="mb-1 font-display text-sm font-bold text-zinc-900">Supplements</h2>
+        <p className="mb-3 text-xs text-zinc-400">Paid add-ons like double cheese, extra meat, kofta, double chicken… Unlike Sauces, which products offer a supplement is chosen per-product (open a product below → Supplements). Hide one here to pull it off every product without deleting it.</p>
+        <div className="flex flex-wrap items-start gap-3">
+          {supplements.map((s) => (
+            <div key={s.id} className="flex w-20 flex-col items-center gap-1.5 text-center">
+              <label className="group relative h-16 w-16 cursor-pointer">
+                {s.image_url ? (
+                  <img src={s.image_url} alt="" className={`h-16 w-16 rounded-full object-cover ring-1 ring-zinc-200 ${s.is_active ? '' : 'opacity-40 grayscale'}`} />
+                ) : (
+                  <div className={`flex h-16 w-16 items-center justify-center rounded-full bg-zinc-50 text-zinc-300 ring-1 ring-zinc-200 ${s.is_active ? '' : 'opacity-40'}`}>
+                    <ImagePlus size={18} />
+                  </div>
+                )}
+                <div className="absolute inset-0 flex items-center justify-center rounded-full bg-zinc-900/0 text-transparent transition group-hover:bg-zinc-900/40 group-hover:text-white">
+                  {uploadingSupplementPhoto === s.id ? <span className="text-[9px] font-bold">…</span> : <Pencil size={13} />}
+                </div>
+                <input
+                  type="file"
+                  accept="image/*,.heic,.heif,.avif,.svg,.webp,.gif,.bmp,.tiff"
+                  className="hidden"
+                  onChange={(e) => e.target.files?.[0] && uploadSupplementPhoto(e.target.files[0], s.id)}
+                />
+              </label>
+              <p className="truncate text-[11px] font-bold text-zinc-700">{s.name}</p>
+              {s.price > 0 && <p className="-mt-1 text-[10px] text-zinc-400">+{money(s.price)}</p>}
+              <button onClick={() => toggleSupplementActive(s)} title={s.is_active ? 'Hide from e-menu' : 'Show on e-menu'} className={`rounded-full px-2 py-0.5 text-[9px] font-bold ${s.is_active ? 'bg-brand-50 text-brand-700' : 'bg-zinc-100 text-zinc-400'}`}>
+                {s.is_active ? 'Visible' : 'Hidden'}
+              </button>
+              <button onClick={() => removeSupplement(s)} className="text-zinc-300 hover:text-red-500"><Trash2 size={11} /></button>
+            </div>
+          ))}
+          {supplements.length === 0 && <p className="text-xs text-zinc-400">No supplements yet — add your first one.</p>}
+        </div>
+
+        <div className="mt-4 flex items-end gap-2 border-t border-zinc-50 pt-3">
+          <label className="group relative h-12 w-12 shrink-0 cursor-pointer">
+            {newSupplement.image_url ? (
+              <img src={newSupplement.image_url} alt="" className="h-12 w-12 rounded-full object-cover ring-1 ring-zinc-200" />
+            ) : (
+              <div className="flex h-12 w-12 items-center justify-center rounded-full border border-dashed border-zinc-300 bg-zinc-50 text-zinc-300">
+                <ImagePlus size={16} />
+              </div>
+            )}
+            <input
+              type="file"
+              accept="image/*,.heic,.heif,.avif,.svg,.webp,.gif,.bmp,.tiff"
+              className="hidden"
+              onChange={(e) => e.target.files?.[0] && uploadSupplementPhoto(e.target.files[0], 'new')}
+            />
+          </label>
+          <input value={newSupplement.name} onChange={(e) => setNewSupplement({ ...newSupplement, name: e.target.value })} placeholder="New supplement…" className="w-32 rounded-lg border border-zinc-200 px-3 py-1.5 text-xs outline-none focus:border-brand-400" />
+          <input value={newSupplement.price} onChange={(e) => setNewSupplement({ ...newSupplement, price: e.target.value })} type="number" step="0.10" min="0" placeholder="Extra €" className="w-20 rounded-lg border border-zinc-200 px-3 py-1.5 text-xs outline-none focus:border-brand-400" />
+          <button onClick={addSupplement} disabled={savingSupplement || uploadingSupplementPhoto === 'new'} className="rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-bold text-white hover:bg-zinc-800 disabled:opacity-60">Add</button>
         </div>
       </div>
 
@@ -502,6 +658,38 @@ export default function MenuManagePage() {
               </label>
             </div>
             <p className="mt-1.5 text-[10px] text-zinc-400">Shown as a swipeable gallery on the product detail sheet, in addition to the cover photo above.</p>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-[10px] font-bold uppercase text-zinc-400">Supplements — offered on this product</label>
+            {supplements.length === 0 ? (
+              <p className="text-xs text-zinc-400">No supplements in the catalog yet — add some in the Supplements section above.</p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {supplements.map((s) => {
+                  const active = selectedSupplementIds.includes(s.id);
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => toggleProductSupplement(s.id)}
+                      title={s.is_active ? undefined : 'Hidden from the e-menu — toggle it back on in the Supplements section above'}
+                      className={`flex items-center gap-1.5 rounded-full border-2 py-1.5 pl-1.5 pr-3 text-xs font-bold transition ${
+                        active ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-zinc-100 bg-white text-zinc-500 hover:border-zinc-200'
+                      } ${s.is_active ? '' : 'opacity-50'}`}
+                    >
+                      {s.image_url ? (
+                        <img src={s.image_url} alt="" className="h-6 w-6 rounded-full object-cover" />
+                      ) : (
+                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-zinc-100 text-zinc-400"><Layers size={12} /></span>
+                      )}
+                      {s.name}{s.price > 0 && <span className="opacity-60">+{money(s.price)}</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            <p className="mt-1.5 text-[10px] text-zinc-400">Pick which supplements customers can add to this specific product. Unlike sauces, this isn't tied to the category.</p>
           </div>
 
           <label className="flex items-center gap-2 text-sm font-semibold text-zinc-700">

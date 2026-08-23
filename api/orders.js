@@ -133,6 +133,21 @@ export default async function handler(req, res) {
         sauceById = Object.fromEntries((sauces || []).map((s) => [s.id, s]));
       }
 
+      // Supplements: same optional-add-on treatment as sauces (only ACTIVE
+      // ones count; a hidden one is silently dropped rather than failing
+      // the order). Unlike sauces, which supplements are even offered was
+      // chosen per-product by the admin, but that's a display-time concern
+      // for the e-menu — at checkout we trust whatever supplement_ids the
+      // client sent, same as sauce_ids.
+      const supplementIds = [...new Set(items.flatMap((i) => (Array.isArray(i.supplement_ids) ? i.supplement_ids : []).map(Number)))];
+      let supplementById = {};
+      if (supplementIds.length) {
+        const { data: supplements, error: supErr } = await supabase
+          .from('supplements').select('*').in('id', supplementIds).eq('is_active', true);
+        if (supErr) throw supErr;
+        supplementById = Object.fromEntries((supplements || []).map((s) => [s.id, s]));
+      }
+
       const rows = [];
       let subtotal = 0;
       for (const it of items) {
@@ -151,17 +166,22 @@ export default async function handler(req, res) {
           .map((id) => sauceById[Number(id)])
           .filter(Boolean)
           .map((s) => ({ name: s.name, price: Number(s.price) }));
+        const chosenSupplements = (Array.isArray(it.supplement_ids) ? it.supplement_ids : [])
+          .map((id) => supplementById[Number(id)])
+          .filter(Boolean)
+          .map((s) => ({ name: s.name, price: Number(s.price) }));
         const sauceTotal = chosenSauces.reduce((n, s) => n + s.price, 0);
-        const unit_price = Math.round((p.price + sauceTotal) * 100) / 100;
+        const supplementTotal = chosenSupplements.reduce((n, s) => n + s.price, 0);
+        const unit_price = Math.round((p.price + sauceTotal + supplementTotal) * 100) / 100;
 
         const line_total = Math.round(unit_price * quantity * 100) / 100;
         subtotal += line_total;
         // line_total is a GENERATED ALWAYS column in the DB (unit_price * quantity),
         // so it must NOT be included in the insert — Postgres computes it itself.
-        // unit_price already folds in the chosen sauces' price so the generated
-        // line_total (and every downstream total) stays correct without any
-        // extra math elsewhere.
-        rows.push({ product_id: p.id, product_name: p.name, unit_price, quantity, sauces: chosenSauces });
+        // unit_price already folds in the chosen sauces'/supplements' price so
+        // the generated line_total (and every downstream total) stays correct
+        // without any extra math elsewhere.
+        rows.push({ product_id: p.id, product_name: p.name, unit_price, quantity, sauces: chosenSauces, supplements: chosenSupplements });
       }
       subtotal = Math.round(subtotal * 100) / 100;
       const tax_rate = await getTaxRate();

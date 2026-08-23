@@ -14,6 +14,17 @@ async function requireStaff(req, res) {
   return user;
 }
 
+// This endpoint serves two near-identical tables — `sauces` and
+// `supplements` — behind one route, since the project is capped at 12
+// /api files on the Vercel Hobby plan. `type` picks the table:
+//   ?type=supplement (GET) / body.type === 'supplement' (POST/PUT/DELETE)
+//     -> public.supplements
+//   anything else, including omitted (default 'sauce')
+//     -> public.sauces (unchanged behavior — existing callers that never
+//        send `type` keep hitting the same table exactly as before).
+const TABLES = { sauce: 'sauces', supplement: 'supplements' };
+const tableFor = (type) => TABLES[type] || TABLES.sauce;
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
@@ -22,9 +33,10 @@ export default async function handler(req, res) {
 
   try {
     if (req.method === 'GET') {
-      let q = supabase.from('sauces').select('*').order('sort_order').order('name');
+      const table = tableFor(req.query.type);
+      let q = supabase.from(table).select('*').order('sort_order').order('name');
       // The public e-menu only ever asks for active=1; staff screens fetch
-      // everything (including hidden sauces) so they can toggle them back on.
+      // everything (including hidden rows) so they can toggle them back on.
       if (req.query.active === '1') q = q.eq('is_active', true);
       const { data, error } = await q;
       if (error) throw error;
@@ -33,10 +45,12 @@ export default async function handler(req, res) {
 
     if (req.method === 'POST') {
       if (!(await requireStaff(req, res))) return;
-      const { name, price, image_url, sort_order } = req.body || {};
-      if (!name || !String(name).trim()) return res.status(400).json({ error: 'Sauce name is required' });
+      const { name, price, image_url, sort_order, type } = req.body || {};
+      const table = tableFor(type);
+      const label = type === 'supplement' ? 'Supplement' : 'Sauce';
+      if (!name || !String(name).trim()) return res.status(400).json({ error: `${label} name is required` });
       const { data, error } = await supabase
-        .from('sauces')
+        .from(table)
         .insert({
           name: String(name).trim(),
           price: Number(price) || 0,
@@ -51,11 +65,12 @@ export default async function handler(req, res) {
 
     if (req.method === 'PUT') {
       if (!(await requireStaff(req, res))) return;
-      const { id, ...fields } = req.body || {};
+      const { id, type, ...fields } = req.body || {};
+      const table = tableFor(type);
       if (!id) return res.status(400).json({ error: 'id is required' });
       if (fields.price != null) fields.price = Number(fields.price);
       const { data, error } = await supabase
-        .from('sauces')
+        .from(table)
         .update(fields)
         .eq('id', Number(id))
         .select()
@@ -66,8 +81,9 @@ export default async function handler(req, res) {
 
     if (req.method === 'DELETE') {
       if (!(await requireStaff(req, res))) return;
-      const { id } = req.body || {};
-      const { error } = await supabase.from('sauces').delete().eq('id', Number(id));
+      const { id, type } = req.body || {};
+      const table = tableFor(type);
+      const { error } = await supabase.from(table).delete().eq('id', Number(id));
       if (error) throw error;
       return res.status(200).json({ ok: true });
     }

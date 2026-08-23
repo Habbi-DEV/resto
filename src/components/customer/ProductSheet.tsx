@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ChevronLeft, ChevronRight, Droplet, Minus, Plus, X } from 'lucide-react';
-import type { Category, Product, Sauce } from '../../lib/types';
+import { ChevronLeft, ChevronRight, Droplet, Layers, Minus, Plus, X } from 'lucide-react';
+import type { Category, Product, Sauce, Supplement } from '../../lib/types';
 import { money } from '../../lib/format';
 
 interface Props {
@@ -11,15 +11,16 @@ interface Props {
    *  never shows the sauce picker. */
   categories: Category[];
   onClose: () => void;
-  onAdd: (p: Product, qty: number, sauces: Sauce[]) => void;
+  onAdd: (p: Product, qty: number, sauces: Sauce[], supplements: Supplement[]) => void;
 }
 
 // Multiple stacked drop-shadows (not a box border) so the orange highlight
-// traces the sauce bowl's own alpha silhouette instead of a rectangle —
-// two tight passes build a crisp outline, two passes with modest blur build
-// a contained glow that hugs the bowl rather than spreading far past it.
+// traces the swatch's own alpha silhouette instead of a rectangle — two
+// tight passes build a crisp outline, two passes with modest blur build a
+// contained glow that hugs the shape rather than spreading far past it.
 // Matches the brand-500/600 orange used elsewhere (e.g. "Add to cart").
-const SAUCE_SELECTED_FILTER =
+// Shared by both Sauces and Supplements so the two pickers look identical.
+const SELECTED_FILTER =
   'drop-shadow(0 0 1.5px #f97316) drop-shadow(0 0 1.5px #f97316) drop-shadow(0 0 3px rgba(249,115,22,0.65)) drop-shadow(0 0 6px rgba(249,115,22,0.35))';
 
 export default function ProductSheet({ product, categories, onClose, onAdd }: Props) {
@@ -27,6 +28,7 @@ export default function ProductSheet({ product, categories, onClose, onAdd }: Pr
   const [photoIdx, setPhotoIdx] = useState(0);
   const [sauces, setSauces] = useState<Sauce[]>([]);
   const [selectedSauceIds, setSelectedSauceIds] = useState<number[]>([]);
+  const [selectedSupplementIds, setSelectedSupplementIds] = useState<number[]>([]);
 
   // Cover photo first, then the gallery — one strip customers can flip through.
   const photos = product
@@ -39,11 +41,17 @@ export default function ProductSheet({ product, categories, onClose, onAdd }: Pr
   const category = product ? categories.find((c) => c.id === product.category_id) : undefined;
   const sauceEligible = category?.allows_sauces !== false;
 
+  // Supplements come straight off the product itself (attached by the API
+  // from product_supplements) — no separate fetch, no category rule. Only
+  // the ones the admin left visible (is_active) show up here.
+  const supplements = (product?.supplements ?? []).filter((s) => s.is_active);
+
   useEffect(() => {
     if (!product) return;
     setQty(1);
     setPhotoIdx(0);
     setSelectedSauceIds([]);
+    setSelectedSupplementIds([]);
     if (!sauceEligible) {
       setSauces([]);
       return;
@@ -57,8 +65,16 @@ export default function ProductSheet({ product, categories, onClose, onAdd }: Pr
   const toggleSauce = (id: number) =>
     setSelectedSauceIds((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
 
+  const toggleSupplement = (id: number) =>
+    setSelectedSupplementIds((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+
   const chosenSauces = sauces.filter((s) => selectedSauceIds.includes(s.id));
-  const unitPrice = product ? product.price + chosenSauces.reduce((n, s) => n + s.price, 0) : 0;
+  const chosenSupplements = supplements.filter((s) => selectedSupplementIds.includes(s.id));
+  const unitPrice = product
+    ? product.price
+      + chosenSauces.reduce((n, s) => n + s.price, 0)
+      + chosenSupplements.reduce((n, s) => n + s.price, 0)
+    : 0;
 
   return (
     <AnimatePresence>
@@ -144,14 +160,60 @@ export default function ProductSheet({ product, categories, onClose, onAdd }: Pr
                                 src={s.image_url}
                                 alt=""
                                 className="h-14 w-14 object-contain transition-[filter] duration-200"
-                                style={active ? { filter: SAUCE_SELECTED_FILTER } : undefined}
+                                style={active ? { filter: SELECTED_FILTER } : undefined}
                               />
                             ) : (
                               <span
                                 className="flex h-11 w-11 items-center justify-center rounded-full bg-zinc-100 text-zinc-400 transition-[filter] duration-200"
-                                style={active ? { filter: SAUCE_SELECTED_FILTER } : undefined}
+                                style={active ? { filter: SELECTED_FILTER } : undefined}
                               >
                                 <Droplet size={18} />
+                              </span>
+                            )}
+                          </span>
+                          <span className={`truncate text-[11px] leading-tight ${active ? 'font-bold text-brand-700' : 'font-semibold text-zinc-600'}`}>
+                            {s.name}
+                          </span>
+                          {s.price > 0 && <span className="-mt-1 text-[10px] text-zinc-400">+{money(s.price)}</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {supplements.length > 0 && (
+                <div className="mt-5">
+                  <p className="mb-3 text-xs font-bold uppercase tracking-wide text-zinc-400">Supplements</p>
+                  <div className="flex flex-wrap gap-4">
+                    {supplements.map((s) => {
+                      const active = selectedSupplementIds.includes(s.id);
+                      return (
+                        <button
+                          key={s.id}
+                          onClick={() => toggleSupplement(s.id)}
+                          className="flex w-16 flex-col items-center gap-1.5"
+                        >
+                          {/* Same treatment as the sauce swatches above: a bare
+                              layout box (no bg/border/overflow-hidden) so a
+                              transparent-PNG supplement photo sits directly on
+                              the page, with the orange selected state applied
+                              as a drop-shadow that hugs the photo's real
+                              silhouette instead of a rectangle. */}
+                          <span className="flex h-14 w-14 items-center justify-center">
+                            {s.image_url ? (
+                              <img
+                                src={s.image_url}
+                                alt=""
+                                className="h-14 w-14 object-contain transition-[filter] duration-200"
+                                style={active ? { filter: SELECTED_FILTER } : undefined}
+                              />
+                            ) : (
+                              <span
+                                className="flex h-11 w-11 items-center justify-center rounded-full bg-zinc-100 text-zinc-400 transition-[filter] duration-200"
+                                style={active ? { filter: SELECTED_FILTER } : undefined}
+                              >
+                                <Layers size={18} />
                               </span>
                             )}
                           </span>
@@ -186,7 +248,7 @@ export default function ProductSheet({ product, categories, onClose, onAdd }: Pr
                 </div>
                 <button
                   onClick={() => {
-                    onAdd(product, qty, chosenSauces);
+                    onAdd(product, qty, chosenSauces, chosenSupplements);
                     onClose();
                   }}
                   className="flex-1 rounded-full bg-brand-500 py-3.5 font-display text-[15px] font-bold text-white shadow-lg shadow-orange-500/30 transition hover:bg-brand-600 active:scale-[0.98]"

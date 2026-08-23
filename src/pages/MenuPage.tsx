@@ -117,7 +117,7 @@ export default function MenuPage() {
         </motion.button>
       )}
 
-      <ProductSheet key={detail?.id ?? 'none'} product={detail} categories={categories} onClose={() => setDetail(null)} onAdd={(p, q, sauces) => add(p, q, sauces)} />
+      <ProductSheet key={detail?.id ?? 'none'} product={detail} categories={categories} onClose={() => setDetail(null)} onAdd={(p, q, sauces, supplements) => add(p, q, sauces, supplements)} />
       <CartSheet open={cartOpen} onClose={() => setCartOpen(false)} onPlaced={setPlaced} />
       {placed && <OrderTracker order={placed} onClose={() => setPlaced(null)} />}
     </div>

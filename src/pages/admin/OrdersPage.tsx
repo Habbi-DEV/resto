@@ -143,8 +143,10 @@ export default function OrdersPage() {
                         <span className="truncate">{it.quantity}× {it.product_name}</span>
                         <span className="ml-2 shrink-0 text-zinc-400">{money(it.line_total)}</span>
                       </p>
-                      {it.sauces && it.sauces.length > 0 && (
-                        <p className="truncate pl-3 text-[10px] text-zinc-400">+ {it.sauces.map((s) => s.name).join(', ')}</p>
+                      {((it.sauces?.length ?? 0) > 0 || (it.supplements?.length ?? 0) > 0) && (
+                        <p className="truncate pl-3 text-[10px] text-zinc-400">
+                          + {[...(it.sauces ?? []), ...(it.supplements ?? [])].map((s) => s.name).join(', ')}
+                        </p>
                       )}
                     </div>
                   ))}

@@ -93,7 +93,12 @@ export default function RegisterPage() {
           delivery_address: orderType === 'delivery' ? address : undefined,
           notes: notes || undefined,
           payment_method: 'card',
-          items: lines.map((l) => ({ product_id: l.product.id, quantity: l.qty, sauce_ids: l.sauces.map((s) => s.id) })),
+          items: lines.map((l) => ({
+            product_id: l.product.id,
+            quantity: l.qty,
+            sauce_ids: l.sauces.map((s) => s.id),
+            supplement_ids: l.supplements.map((s) => s.id),
+          })),
         }),
       });
       clear();
