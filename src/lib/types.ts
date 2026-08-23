@@ -17,8 +17,8 @@ export interface Category {
   icon: string;
   sort_order: number;
   is_active: boolean;
-  /** When false, products in this category never offer sauces (e.g. drinks, desserts). */
   allows_sauces: boolean;
+
 }
 
 export interface ProductImage {
@@ -45,9 +45,9 @@ export interface Sauce {
   id: number;
   name: string;
   price: number;
-  image_url: string | null;
   is_active: boolean;
   sort_order: number;
+  image_url: string | null;
 }
 
 /** Snapshot of a sauce as recorded on an order_item — never a live FK join. */
@@ -108,6 +108,28 @@ export interface Stats {
   active_orders: number;
   avg_order: number;
   by_type: Record<OrderType, number>;
+}
+
+export type Currency = 'EUR' | 'USD' | 'MAD' | 'DZD';
+
+export interface Settings {
+  id: number;
+  restaurant_name: string;
+  logo_url: string;
+  address: string;
+  phone: string;
+  contact_email: string;
+  opening_hours: string;
+  currency: Currency;
+  tax_rate: number;
+  delivery_fee: number;
+  delivery_min_order: number;
+  payment_cash_enabled: boolean;
+  payment_card_enabled: boolean;
+  new_order_sound_enabled: boolean;
+  low_stock_threshold: number;
+  brand_color: string;
+  updated_at: string;
 }
 
 export const ACTIVE_STATUSES: OrderStatus[] = [
