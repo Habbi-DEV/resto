@@ -10,14 +10,13 @@ interface Props {
   onAdd: (p: Product, qty: number, sauces: Sauce[], supplements: Supplement[]) => void;
 }
 
-// Multiple stacked drop-shadows (not a box border) so the orange highlight
+// Multiple stacked drop-shadows (not a box border) so the green highlight
 // traces the swatch's own alpha silhouette instead of a rectangle — two
 // tight passes build a crisp outline, two passes with modest blur build a
 // contained glow that hugs the shape rather than spreading far past it.
-// Matches the brand-500/600 orange used elsewhere (e.g. "Add to cart").
 // Shared by both Sauces and Supplements so the two pickers look identical.
 const SELECTED_FILTER =
-  'drop-shadow(0 0 1.5px #f97316) drop-shadow(0 0 1.5px #f97316) drop-shadow(0 0 3px rgba(249,115,22,0.65)) drop-shadow(0 0 6px rgba(249,115,22,0.35))';
+  'drop-shadow(0 0 1.5px #22c55e) drop-shadow(0 0 1.5px #22c55e) drop-shadow(0 0 3px rgba(34,197,94,0.65)) drop-shadow(0 0 6px rgba(34,197,94,0.35))';
 
 export default function ProductSheet({ product, onClose, onAdd }: Props) {
   const [qty, setQty] = useState(1);
@@ -154,7 +153,7 @@ export default function ProductSheet({ product, onClose, onAdd }: Props) {
                               </span>
                             )}
                           </span>
-                          <span className={`truncate text-[11px] leading-tight ${active ? 'font-bold text-brand-700' : 'font-semibold text-zinc-600'}`}>
+                          <span className={`truncate text-[11px] leading-tight ${active ? 'font-bold text-green-700' : 'font-semibold text-zinc-600'}`}>
                             {s.name}
                           </span>
                           {s.price > 0 && <span className="-mt-1 text-[10px] text-zinc-400">+{money(s.price)}</span>}
@@ -200,7 +199,7 @@ export default function ProductSheet({ product, onClose, onAdd }: Props) {
                               </span>
                             )}
                           </span>
-                          <span className={`truncate text-[11px] leading-tight ${active ? 'font-bold text-brand-700' : 'font-semibold text-zinc-600'}`}>
+                          <span className={`truncate text-[11px] leading-tight ${active ? 'font-bold text-green-700' : 'font-semibold text-zinc-600'}`}>
                             {s.name}
                           </span>
                           {s.price > 0 && <span className="-mt-1 text-[10px] text-zinc-400">+{money(s.price)}</span>}
