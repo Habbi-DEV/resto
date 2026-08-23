@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ImagePlus, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { Droplet, ImagePlus, Pencil, Plus, Trash2, X } from 'lucide-react';
 import type { Category, Product, ProductImage, Sauce } from '../../lib/types';
 import { api } from '../../lib/api';
 import supabase from '../../lib/supabase';
@@ -149,6 +149,11 @@ export default function MenuManagePage() {
 
   const toggleCategory = async (c: Category) => {
     await api('/api/categories', { method: 'PUT', body: JSON.stringify({ id: c.id, is_active: !c.is_active }) }).catch(console.error);
+    load();
+  };
+
+  const toggleCategorySauces = async (c: Category) => {
+    await api('/api/categories', { method: 'PUT', body: JSON.stringify({ id: c.id, allows_sauces: !c.allows_sauces }) }).catch(console.error);
     load();
   };
 
@@ -323,6 +328,13 @@ export default function MenuManagePage() {
             <div key={c.id} className={`flex items-center gap-2 rounded-full border py-1.5 pl-3 pr-1.5 text-xs font-semibold ${c.is_active ? 'border-zinc-200 bg-white text-zinc-700' : 'border-dashed border-zinc-200 bg-zinc-50 text-zinc-400'}`}>
               <span>{c.icon} {c.name}</span>
               <button onClick={() => toggleCategory(c)} title={c.is_active ? 'Deactivate' : 'Activate'} className={`h-2 w-2 rounded-full ${c.is_active ? 'bg-brand-500' : 'bg-zinc-300'}`} />
+              <button
+                onClick={() => toggleCategorySauces(c)}
+                title={c.allows_sauces ? 'Sauces offered on these products — click to turn off (e.g. drinks, desserts)' : 'Sauces are hidden for these products — click to turn on'}
+                className={`flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-bold ${c.allows_sauces ? 'bg-brand-50 text-brand-700' : 'bg-zinc-100 text-zinc-400'}`}
+              >
+                <Droplet size={10} />
+              </button>
               <button onClick={() => removeCategory(c)} className="text-zinc-300 hover:text-red-500"><Trash2 size={12} /></button>
             </div>
           ))}
@@ -337,7 +349,7 @@ export default function MenuManagePage() {
       {/* sauces */}
       <div className="mb-6 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-zinc-100">
         <h2 className="mb-1 font-display text-sm font-bold text-zinc-900">Sauces</h2>
-        <p className="mb-3 text-xs text-zinc-400">Optional add-ons customers can pick when ordering, shown as a round photo on the product sheet. Hide one to pull it off the e-menu without deleting it.</p>
+        <p className="mb-3 text-xs text-zinc-400">Optional add-ons shown on the product sheet — but only for categories with the 🥫 toggle on above (turn it off for Drinks, Desserts, etc). Hide a sauce here to pull it off the e-menu without deleting it.</p>
         <div className="flex flex-wrap items-start gap-3">
           {sauces.map((s) => (
             <div key={s.id} className="flex w-20 flex-col items-center gap-1.5 text-center">
