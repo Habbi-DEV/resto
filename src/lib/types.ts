@@ -17,8 +17,6 @@ export interface Category {
   icon: string;
   sort_order: number;
   is_active: boolean;
-  allows_sauces: boolean;
-
 }
 
 export interface ProductImage {
@@ -39,8 +37,13 @@ export interface Product {
   stock: number;
   /** Extra gallery photos in addition to image_url (the cover photo). */
   images?: ProductImage[];
+  /** Sauces the admin picked for this specific product (New/Edit product
+   *  modal) — same per-product model as Supplements. May include hidden
+   *  (is_active === false) ones; the customer sheet filters those out
+   *  itself. */
+  sauces?: Sauce[];
   /** Supplements the admin picked for this specific product (New/Edit
-   *  product modal) — independent of category, unlike Sauces. May include
+   *  product modal) — same per-product model as Sauces. May include
    *  hidden (is_active === false) ones; the customer sheet filters those
    *  out itself. */
   supplements?: Supplement[];
@@ -56,8 +59,8 @@ export interface Sauce {
 }
 
 /** Same shape as Sauce — paid add-ons like double cheese, extra meat, kofta,
- *  double chicken — but which products offer which supplement is chosen
- *  per-product by the admin instead of per-category. */
+ *  double chicken. Which products offer which supplement (and, since
+ *  migration v6, which sauce) is chosen per-product by the admin. */
 export interface Supplement {
   id: number;
   name: string;

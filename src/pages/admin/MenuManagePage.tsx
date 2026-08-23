@@ -46,10 +46,11 @@ export default function MenuManagePage() {
   const [pendingGallery, setPendingGallery] = useState<string[]>([]);
   const [galleryUploading, setGalleryUploading] = useState(false);
 
-  // Which supplements (from the general catalog above) this specific
-  // product offers — set from `product.supplements` when editing, sent
-  // back as `supplement_ids` on save. Unlike sauces, this is a per-product
-  // pick, not category-driven, so it lives on the product form itself.
+  // Which sauces and supplements (from the general catalogs above) this
+  // specific product offers — set from `product.sauces` / `.supplements`
+  // when editing, sent back as `sauce_ids` / `supplement_ids` on save.
+  // Both are per-product picks that live on the product form itself.
+  const [selectedSauceIds, setSelectedSauceIds] = useState<number[]>([]);
   const [selectedSupplementIds, setSelectedSupplementIds] = useState<number[]>([]);
 
   const load = () => {
@@ -79,6 +80,7 @@ export default function MenuManagePage() {
     setError('');
     setGallery([]);
     setPendingGallery([]);
+    setSelectedSauceIds([]);
     setSelectedSupplementIds([]);
     setModalOpen(true);
   };
@@ -97,6 +99,7 @@ export default function MenuManagePage() {
     setError('');
     setGallery(p.images ?? []);
     setPendingGallery([]);
+    setSelectedSauceIds((p.sauces ?? []).map((s) => s.id));
     setSelectedSupplementIds((p.supplements ?? []).map((s) => s.id));
     setModalOpen(true);
   };
@@ -116,6 +119,7 @@ export default function MenuManagePage() {
       image_url: form.image_url,
       stock: Number(form.stock) || 0,
       is_available: form.is_available,
+      sauce_ids: selectedSauceIds,
       supplement_ids: selectedSupplementIds,
     };
     try {
@@ -164,11 +168,6 @@ export default function MenuManagePage() {
 
   const toggleCategory = async (c: Category) => {
     await api('/api/categories', { method: 'PUT', body: JSON.stringify({ id: c.id, is_active: !c.is_active }) }).catch(console.error);
-    load();
-  };
-
-  const toggleCategorySauces = async (c: Category) => {
-    await api('/api/categories', { method: 'PUT', body: JSON.stringify({ id: c.id, allows_sauces: !c.allows_sauces }) }).catch(console.error);
     load();
   };
 
@@ -389,6 +388,9 @@ export default function MenuManagePage() {
     load();
   };
 
+  const toggleProductSauce = (id: number) =>
+    setSelectedSauceIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
+
   const toggleProductSupplement = (id: number) =>
     setSelectedSupplementIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
 
@@ -414,13 +416,6 @@ export default function MenuManagePage() {
             <div key={c.id} className={`flex items-center gap-2 rounded-full border py-1.5 pl-3 pr-1.5 text-xs font-semibold ${c.is_active ? 'border-zinc-200 bg-white text-zinc-700' : 'border-dashed border-zinc-200 bg-zinc-50 text-zinc-400'}`}>
               <span>{c.icon} {c.name}</span>
               <button onClick={() => toggleCategory(c)} title={c.is_active ? 'Deactivate' : 'Activate'} className={`h-2 w-2 rounded-full ${c.is_active ? 'bg-brand-500' : 'bg-zinc-300'}`} />
-              <button
-                onClick={() => toggleCategorySauces(c)}
-                title={c.allows_sauces ? 'Sauces offered on these products — click to turn off (e.g. drinks, desserts)' : 'Sauces are hidden for these products — click to turn on'}
-                className={`flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-bold ${c.allows_sauces ? 'bg-brand-50 text-brand-700' : 'bg-zinc-100 text-zinc-400'}`}
-              >
-                <Droplet size={10} />
-              </button>
               <button onClick={() => removeCategory(c)} className="text-zinc-300 hover:text-red-500"><Trash2 size={12} /></button>
             </div>
           ))}
@@ -435,7 +430,7 @@ export default function MenuManagePage() {
       {/* sauces */}
       <div className="mb-6 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-zinc-100">
         <h2 className="mb-1 font-display text-sm font-bold text-zinc-900">Sauces</h2>
-        <p className="mb-3 text-xs text-zinc-400">Optional add-ons shown on the product sheet — but only for categories with the 🥫 toggle on above (turn it off for Drinks, Desserts, etc). Hide a sauce here to pull it off the e-menu without deleting it.</p>
+        <p className="mb-3 text-xs text-zinc-400">Optional add-ons shown on the product sheet. Which products offer a sauce is chosen per-product (open a product below → Sauces). Hide a sauce here to pull it off every product without deleting it.</p>
         <div className="flex flex-wrap items-start gap-3">
           {sauces.map((s) => (
             <div key={s.id} className="flex w-20 flex-col items-center gap-1.5 text-center">
@@ -661,6 +656,38 @@ export default function MenuManagePage() {
           </div>
 
           <div>
+            <label className="mb-1 block text-[10px] font-bold uppercase text-zinc-400">Sauces — offered on this product</label>
+            {sauces.length === 0 ? (
+              <p className="text-xs text-zinc-400">No sauces in the catalog yet — add some in the Sauces section above.</p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {sauces.map((s) => {
+                  const active = selectedSauceIds.includes(s.id);
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => toggleProductSauce(s.id)}
+                      title={s.is_active ? undefined : 'Hidden from the e-menu — toggle it back on in the Sauces section above'}
+                      className={`flex items-center gap-1.5 rounded-full border-2 py-1.5 pl-1.5 pr-3 text-xs font-bold transition ${
+                        active ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-zinc-100 bg-white text-zinc-500 hover:border-zinc-200'
+                      } ${s.is_active ? '' : 'opacity-50'}`}
+                    >
+                      {s.image_url ? (
+                        <img src={s.image_url} alt="" className="h-6 w-6 rounded-full object-cover" />
+                      ) : (
+                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-zinc-100 text-zinc-400"><Droplet size={12} /></span>
+                      )}
+                      {s.name}{s.price > 0 && <span className="opacity-60">+{money(s.price)}</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            <p className="mt-1.5 text-[10px] text-zinc-400">Pick which sauces customers can add to this specific product.</p>
+          </div>
+
+          <div>
             <label className="mb-1 block text-[10px] font-bold uppercase text-zinc-400">Supplements — offered on this product</label>
             {supplements.length === 0 ? (
               <p className="text-xs text-zinc-400">No supplements in the catalog yet — add some in the Supplements section above.</p>
@@ -689,7 +716,7 @@ export default function MenuManagePage() {
                 })}
               </div>
             )}
-            <p className="mt-1.5 text-[10px] text-zinc-400">Pick which supplements customers can add to this specific product. Unlike sauces, this isn't tied to the category.</p>
+            <p className="mt-1.5 text-[10px] text-zinc-400">Pick which supplements customers can add to this specific product.</p>
           </div>
 
           <label className="flex items-center gap-2 text-sm font-semibold text-zinc-700">

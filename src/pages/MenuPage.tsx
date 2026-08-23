@@ -26,9 +26,8 @@ export default function MenuPage() {
   useEffect(() => {
     Promise.all([fetch('/api/categories').then((r) => r.json()), fetch('/api/products').then((r) => r.json())])
       .then(([cats, prods]) => {
-        // Keep the full list (including inactive categories) so ProductSheet
-        // can still resolve a product's category to decide whether sauces
-        // apply — the chip strip below filters to active ones itself.
+        // Keep the full list (including inactive categories) for the chip
+        // strip's own bookkeeping — it filters to active ones itself.
         setCategories(Array.isArray(cats) ? cats : []);
         setProducts(Array.isArray(prods) ? prods : []);
       })
@@ -117,7 +116,7 @@ export default function MenuPage() {
         </motion.button>
       )}
 
-      <ProductSheet key={detail?.id ?? 'none'} product={detail} categories={categories} onClose={() => setDetail(null)} onAdd={(p, q, sauces, supplements) => add(p, q, sauces, supplements)} />
+      <ProductSheet key={detail?.id ?? 'none'} product={detail} onClose={() => setDetail(null)} onAdd={(p, q, sauces, supplements) => add(p, q, sauces, supplements)} />
       <CartSheet open={cartOpen} onClose={() => setCartOpen(false)} onPlaced={setPlaced} />
       {placed && <OrderTracker order={placed} onClose={() => setPlaced(null)} />}
     </div>

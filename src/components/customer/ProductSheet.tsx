@@ -1,15 +1,11 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Droplet, Layers, Minus, Plus, X } from 'lucide-react';
-import type { Category, Product, Sauce, Supplement } from '../../lib/types';
+import type { Product, Sauce, Supplement } from '../../lib/types';
 import { money } from '../../lib/format';
 
 interface Props {
   product: Product | null;
-  /** Used to look up the product's category and check allows_sauces — a
-   *  product in a category with sauces turned off (e.g. Drinks, Desserts)
-   *  never shows the sauce picker. */
-  categories: Category[];
   onClose: () => void;
   onAdd: (p: Product, qty: number, sauces: Sauce[], supplements: Supplement[]) => void;
 }
@@ -23,10 +19,9 @@ interface Props {
 const SELECTED_FILTER =
   'drop-shadow(0 0 1.5px #f97316) drop-shadow(0 0 1.5px #f97316) drop-shadow(0 0 3px rgba(249,115,22,0.65)) drop-shadow(0 0 6px rgba(249,115,22,0.35))';
 
-export default function ProductSheet({ product, categories, onClose, onAdd }: Props) {
+export default function ProductSheet({ product, onClose, onAdd }: Props) {
   const [qty, setQty] = useState(1);
   const [photoIdx, setPhotoIdx] = useState(0);
-  const [sauces, setSauces] = useState<Sauce[]>([]);
   const [selectedSauceIds, setSelectedSauceIds] = useState<number[]>([]);
   const [selectedSupplementIds, setSelectedSupplementIds] = useState<number[]>([]);
 
@@ -35,15 +30,11 @@ export default function ProductSheet({ product, categories, onClose, onAdd }: Pr
     ? [product.image_url, ...(product.images ?? []).map((i) => i.url)].filter(Boolean)
     : [];
 
-  // Categories default to allowing sauces, so an uncategorized product (or
-  // one whose category didn't come through) still gets sauces — only an
-  // explicit allows_sauces === false (Drinks, Desserts, ...) turns them off.
-  const category = product ? categories.find((c) => c.id === product.category_id) : undefined;
-  const sauceEligible = category?.allows_sauces !== false;
-
-  // Supplements come straight off the product itself (attached by the API
-  // from product_supplements) — no separate fetch, no category rule. Only
-  // the ones the admin left visible (is_active) show up here.
+  // Sauces and supplements both come straight off the product itself
+  // (attached by the API from product_sauces / product_supplements) — no
+  // separate fetch, no category rule. Only the ones the admin left visible
+  // (is_active) show up here.
+  const sauces = (product?.sauces ?? []).filter((s) => s.is_active);
   const supplements = (product?.supplements ?? []).filter((s) => s.is_active);
 
   useEffect(() => {
@@ -52,15 +43,7 @@ export default function ProductSheet({ product, categories, onClose, onAdd }: Pr
     setPhotoIdx(0);
     setSelectedSauceIds([]);
     setSelectedSupplementIds([]);
-    if (!sauceEligible) {
-      setSauces([]);
-      return;
-    }
-    fetch('/api/sauces?active=1')
-      .then((r) => r.json())
-      .then((d: Sauce[]) => setSauces(Array.isArray(d) ? d : []))
-      .catch(() => setSauces([]));
-  }, [product, sauceEligible]);
+  }, [product]);
 
   const toggleSauce = (id: number) =>
     setSelectedSauceIds((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
