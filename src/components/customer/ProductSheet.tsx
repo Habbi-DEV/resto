@@ -10,11 +10,21 @@ interface Props {
   onAdd: (p: Product, qty: number, sauces: Sauce[]) => void;
 }
 
+// Multiple stacked drop-shadows (not a box border) so the orange highlight
+// traces the sauce bowl's own alpha silhouette instead of a rectangle —
+// two tight passes build a crisp outline, two wider/fainter passes build
+// the soft glow around it. Matches the brand-500/600 orange used elsewhere
+// (e.g. the "Add to cart" button).
+const SAUCE_SELECTED_FILTER =
+  'drop-shadow(0 0 1.5px #f97316) drop-shadow(0 0 1.5px #f97316) drop-shadow(0 0 7px rgba(249,115,22,0.55)) drop-shadow(0 0 14px rgba(249,115,22,0.3))';
+
 export default function ProductSheet({ product, onClose, onAdd }: Props) {
   const [qty, setQty] = useState(1);
   const [photoIdx, setPhotoIdx] = useState(0);
   const [sauces, setSauces] = useState<Sauce[]>([]);
-  const [selectedSauceIds, setSelectedSauceIds] = useState<number[]>([]);
+  // Only one sauce can be picked at a time — selecting a new one clears the
+  // previous pick (see toggleSauce below).
+  const [selectedSauceId, setSelectedSauceId] = useState<number | null>(null);
 
   // Cover photo first, then the gallery — one strip customers can flip through.
   const photos = product
@@ -25,17 +35,16 @@ export default function ProductSheet({ product, onClose, onAdd }: Props) {
     if (!product) return;
     setQty(1);
     setPhotoIdx(0);
-    setSelectedSauceIds([]);
+    setSelectedSauceId(null);
     fetch('/api/sauces?active=1')
       .then((r) => r.json())
       .then((d: Sauce[]) => setSauces(Array.isArray(d) ? d : []))
       .catch(() => setSauces([]));
   }, [product]);
 
-  const toggleSauce = (id: number) =>
-    setSelectedSauceIds((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+  const toggleSauce = (id: number) => setSelectedSauceId((prev) => (prev === id ? null : id));
 
-  const chosenSauces = sauces.filter((s) => selectedSauceIds.includes(s.id));
+  const chosenSauces = sauces.filter((s) => s.id === selectedSauceId);
   const unitPrice = product ? product.price + chosenSauces.reduce((n, s) => n + s.price, 0) : 0;
 
   return (
@@ -101,30 +110,36 @@ export default function ProductSheet({ product, onClose, onAdd }: Props) {
 
               {sauces.length > 0 && (
                 <div className="mt-5">
-                  <p className="mb-2.5 text-xs font-bold uppercase tracking-wide text-zinc-400">Sauces</p>
-                  <div className="flex flex-wrap gap-3">
+                  <p className="mb-3 text-xs font-bold uppercase tracking-wide text-zinc-400">Sauces</p>
+                  <div className="flex flex-wrap gap-4">
                     {sauces.map((s) => {
-                      const active = selectedSauceIds.includes(s.id);
+                      const active = s.id === selectedSauceId;
                       return (
                         <button
                           key={s.id}
                           onClick={() => toggleSauce(s.id)}
-                          className="flex w-16 flex-col items-center gap-1"
+                          className="flex w-16 flex-col items-center gap-1.5"
                         >
-                          <span
-                            className={`relative flex h-14 w-14 items-center justify-center overflow-hidden rounded-full ring-2 transition ${
-                              active ? 'ring-brand-500' : 'ring-transparent'
-                            }`}
-                          >
+                          {/* Purely a layout box — no bg/border/overflow-hidden, so a
+                              transparent-PNG sauce photo sits directly on the page
+                              with nothing framing it. The orange selected state is a
+                              drop-shadow on the image itself, so it hugs the bowl's
+                              real silhouette instead of this box's rectangle. */}
+                          <span className="flex h-14 w-14 items-center justify-center">
                             {s.image_url ? (
-                              <img src={s.image_url} alt="" className="h-full w-full object-cover" />
+                              <img
+                                src={s.image_url}
+                                alt=""
+                                className="h-14 w-14 object-contain transition-[filter] duration-200"
+                                style={active ? { filter: SAUCE_SELECTED_FILTER } : undefined}
+                              />
                             ) : (
-                              <span className="flex h-full w-full items-center justify-center bg-zinc-100 text-zinc-400">
+                              <span
+                                className="flex h-11 w-11 items-center justify-center rounded-full bg-zinc-100 text-zinc-400 transition-[filter] duration-200"
+                                style={active ? { filter: SAUCE_SELECTED_FILTER } : undefined}
+                              >
                                 <Droplet size={18} />
                               </span>
-                            )}
-                            {active && (
-                              <span className="absolute inset-0 rounded-full ring-2 ring-inset ring-white/70" />
                             )}
                           </span>
                           <span className={`truncate text-[11px] leading-tight ${active ? 'font-bold text-brand-700' : 'font-semibold text-zinc-600'}`}>
