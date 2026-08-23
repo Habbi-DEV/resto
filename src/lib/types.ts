@@ -43,6 +43,7 @@ export interface Sauce {
   id: number;
   name: string;
   price: number;
+  image_url: string | null;
   is_active: boolean;
   sort_order: number;
 }

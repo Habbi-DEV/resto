@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ChevronLeft, ChevronRight, Minus, Plus, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Droplet, Minus, Plus, X } from 'lucide-react';
 import type { Product, Sauce } from '../../lib/types';
 import { money } from '../../lib/format';
 
@@ -67,31 +67,29 @@ export default function ProductSheet({ product, onClose, onAdd }: Props) {
                 <>
                   <button
                     onClick={() => setPhotoIdx((i) => (i - 1 + photos.length) % photos.length)}
+                    className="absolute left-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-zinc-700 shadow transition hover:bg-white active:scale-90"
                     aria-label="Previous photo"
-                    className="absolute left-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-zinc-700 shadow-sm backdrop-blur-sm transition hover:bg-white active:scale-90"
                   >
-                    <ChevronLeft size={16} strokeWidth={2.5} />
+                    <ChevronLeft size={18} />
                   </button>
                   <button
                     onClick={() => setPhotoIdx((i) => (i + 1) % photos.length)}
+                    className="absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-zinc-700 shadow transition hover:bg-white active:scale-90"
                     aria-label="Next photo"
-                    className="absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-zinc-700 shadow-sm backdrop-blur-sm transition hover:bg-white active:scale-90"
                   >
-                    <ChevronRight size={16} strokeWidth={2.5} />
+                    <ChevronRight size={18} />
                   </button>
+                  <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 gap-1.5">
+                    {photos.map((_, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setPhotoIdx(i)}
+                        aria-label={`Photo ${i + 1}`}
+                        className={`h-1.5 rounded-full transition-all ${i === photoIdx ? 'w-5 bg-white' : 'w-1.5 bg-white/60'}`}
+                      />
+                    ))}
+                  </div>
                 </>
-              )}
-              {photos.length > 1 && (
-                <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 gap-1.5">
-                  {photos.map((_, i) => (
-                    <button
-                      key={i}
-                      onClick={() => setPhotoIdx(i)}
-                      aria-label={`Photo ${i + 1}`}
-                      className={`h-1.5 rounded-full transition-all ${i === photoIdx ? 'w-5 bg-white' : 'w-1.5 bg-white/60'}`}
-                    />
-                  ))}
-                </div>
               )}
             </div>
             <div className="overflow-y-auto thin-scroll p-5 pb-8">
@@ -103,19 +101,36 @@ export default function ProductSheet({ product, onClose, onAdd }: Props) {
 
               {sauces.length > 0 && (
                 <div className="mt-5">
-                  <p className="mb-2 text-xs font-bold uppercase tracking-wide text-zinc-400">Sauces</p>
-                  <div className="flex flex-wrap gap-2">
+                  <p className="mb-2.5 text-xs font-bold uppercase tracking-wide text-zinc-400">Sauces</p>
+                  <div className="flex flex-wrap gap-3">
                     {sauces.map((s) => {
                       const active = selectedSauceIds.includes(s.id);
                       return (
                         <button
                           key={s.id}
                           onClick={() => toggleSauce(s.id)}
-                          className={`rounded-full border-2 px-3 py-1.5 text-xs font-bold transition ${
-                            active ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-zinc-100 bg-white text-zinc-500 hover:border-zinc-200'
-                          }`}
+                          className="flex w-16 flex-col items-center gap-1"
                         >
-                          {s.name}{s.price > 0 ? ` +${money(s.price)}` : ''}
+                          <span
+                            className={`relative flex h-14 w-14 items-center justify-center overflow-hidden rounded-full ring-2 transition ${
+                              active ? 'ring-brand-500' : 'ring-transparent'
+                            }`}
+                          >
+                            {s.image_url ? (
+                              <img src={s.image_url} alt="" className="h-full w-full object-cover" />
+                            ) : (
+                              <span className="flex h-full w-full items-center justify-center bg-zinc-100 text-zinc-400">
+                                <Droplet size={18} />
+                              </span>
+                            )}
+                            {active && (
+                              <span className="absolute inset-0 rounded-full ring-2 ring-inset ring-white/70" />
+                            )}
+                          </span>
+                          <span className={`truncate text-[11px] leading-tight ${active ? 'font-bold text-brand-700' : 'font-semibold text-zinc-600'}`}>
+                            {s.name}
+                          </span>
+                          {s.price > 0 && <span className="-mt-1 text-[10px] text-zinc-400">+{money(s.price)}</span>}
                         </button>
                       );
                     })}

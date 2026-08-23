@@ -33,13 +33,14 @@ export default async function handler(req, res) {
 
     if (req.method === 'POST') {
       if (!(await requireStaff(req, res))) return;
-      const { name, price, sort_order } = req.body || {};
+      const { name, price, image_url, sort_order } = req.body || {};
       if (!name || !String(name).trim()) return res.status(400).json({ error: 'Sauce name is required' });
       const { data, error } = await supabase
         .from('sauces')
         .insert({
           name: String(name).trim(),
           price: Number(price) || 0,
+          image_url: image_url || null,
           sort_order: Number(sort_order) || 0,
         })
         .select()
