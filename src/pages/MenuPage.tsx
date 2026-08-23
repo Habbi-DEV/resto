@@ -26,7 +26,10 @@ export default function MenuPage() {
   useEffect(() => {
     Promise.all([fetch('/api/categories').then((r) => r.json()), fetch('/api/products').then((r) => r.json())])
       .then(([cats, prods]) => {
-        setCategories(Array.isArray(cats) ? cats.filter((c: Category) => c.is_active) : []);
+        // Keep the full list (including inactive categories) so ProductSheet
+        // can still resolve a product's category to decide whether sauces
+        // apply — the chip strip below filters to active ones itself.
+        setCategories(Array.isArray(cats) ? cats : []);
         setProducts(Array.isArray(prods) ? prods : []);
       })
       .catch((e) => console.error('menu load failed', e))
@@ -72,7 +75,7 @@ export default function MenuPage() {
             >
               ✨ All
             </button>
-            {categories.map((c) => (
+            {categories.filter((c) => c.is_active).map((c) => (
               <button
                 key={c.id}
                 onClick={() => setActiveCat(c.id)}
@@ -114,7 +117,7 @@ export default function MenuPage() {
         </motion.button>
       )}
 
-      <ProductSheet key={detail?.id ?? 'none'} product={detail} onClose={() => setDetail(null)} onAdd={(p, q, sauces) => add(p, q, sauces)} />
+      <ProductSheet key={detail?.id ?? 'none'} product={detail} categories={categories} onClose={() => setDetail(null)} onAdd={(p, q, sauces) => add(p, q, sauces)} />
       <CartSheet open={cartOpen} onClose={() => setCartOpen(false)} onPlaced={setPlaced} />
       {placed && <OrderTracker order={placed} onClose={() => setPlaced(null)} />}
     </div>
