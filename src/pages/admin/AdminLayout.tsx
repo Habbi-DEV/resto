@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
   Armchair, Database, ExternalLink, LayoutDashboard, LogOut,
-  Package, ReceiptText, ShoppingCart, UtensilsCrossed,
+  Package, ReceiptText, Settings, ShoppingCart, UtensilsCrossed,
 } from 'lucide-react';
 import supabase from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -16,6 +16,11 @@ const NAV = [
   { to: '/admin/tables', label: 'Tables', icon: Armchair, end: false },
   { to: '/admin/inventory', label: 'Inventory', icon: Package, end: false },
   { to: '/admin/schema', label: 'Schema SQL', icon: Database, end: false },
+  // Admin-only in practice: /api/settings PUT is guarded server-side by
+  // requireAdmin (api/settings.js). There's no client-side role in
+  // AuthContext yet to hide this link for non-admin staff, so any staff
+  // member can open the page but only admins can actually save changes.
+  { to: '/admin/settings', label: 'Settings', icon: Settings, end: false },
 ];
 
 function Brand() {

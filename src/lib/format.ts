@@ -1,5 +1,21 @@
-export const money = (n: number): string =>
-  `€${(Math.round((Number(n) || 0) * 100) / 100).toFixed(2)}`;
+import { getCachedSettings } from './settings';
+
+// Symbol/label shown before the amount. DH and DA read a little oddly as a
+// prefix (they're usually written after the number), but a single prefix
+// format keeps every call site simple for v1 — this is the one place to
+// change if that's revisited.
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  EUR: '€', USD: '$', MAD: 'DH', DZD: 'DA',
+};
+
+// Falls back to € whenever settings haven't loaded yet (e.g. very first
+// paint before loadSettings() resolves in App.tsx) or the currency stored
+// isn't recognized.
+export const money = (n: number): string => {
+  const currency = getCachedSettings()?.currency ?? 'EUR';
+  const symbol = CURRENCY_SYMBOLS[currency] ?? '€';
+  return `${symbol}${(Math.round((Number(n) || 0) * 100) / 100).toFixed(2)}`;
+};
 
 export const orderNumber = (id: number): string => `#${id + 1000}`;
 
