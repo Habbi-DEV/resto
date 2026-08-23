@@ -12,19 +12,17 @@ interface Props {
 
 // Multiple stacked drop-shadows (not a box border) so the orange highlight
 // traces the sauce bowl's own alpha silhouette instead of a rectangle —
-// two tight passes build a crisp outline, two wider/fainter passes build
-// the soft glow around it. Matches the brand-500/600 orange used elsewhere
-// (e.g. the "Add to cart" button).
+// two tight passes build a crisp outline, two passes with modest blur build
+// a contained glow that hugs the bowl rather than spreading far past it.
+// Matches the brand-500/600 orange used elsewhere (e.g. "Add to cart").
 const SAUCE_SELECTED_FILTER =
-  'drop-shadow(0 0 1.5px #f97316) drop-shadow(0 0 1.5px #f97316) drop-shadow(0 0 7px rgba(249,115,22,0.55)) drop-shadow(0 0 14px rgba(249,115,22,0.3))';
+  'drop-shadow(0 0 1.5px #f97316) drop-shadow(0 0 1.5px #f97316) drop-shadow(0 0 3px rgba(249,115,22,0.65)) drop-shadow(0 0 6px rgba(249,115,22,0.35))';
 
 export default function ProductSheet({ product, onClose, onAdd }: Props) {
   const [qty, setQty] = useState(1);
   const [photoIdx, setPhotoIdx] = useState(0);
   const [sauces, setSauces] = useState<Sauce[]>([]);
-  // Only one sauce can be picked at a time — selecting a new one clears the
-  // previous pick (see toggleSauce below).
-  const [selectedSauceId, setSelectedSauceId] = useState<number | null>(null);
+  const [selectedSauceIds, setSelectedSauceIds] = useState<number[]>([]);
 
   // Cover photo first, then the gallery — one strip customers can flip through.
   const photos = product
@@ -35,16 +33,17 @@ export default function ProductSheet({ product, onClose, onAdd }: Props) {
     if (!product) return;
     setQty(1);
     setPhotoIdx(0);
-    setSelectedSauceId(null);
+    setSelectedSauceIds([]);
     fetch('/api/sauces?active=1')
       .then((r) => r.json())
       .then((d: Sauce[]) => setSauces(Array.isArray(d) ? d : []))
       .catch(() => setSauces([]));
   }, [product]);
 
-  const toggleSauce = (id: number) => setSelectedSauceId((prev) => (prev === id ? null : id));
+  const toggleSauce = (id: number) =>
+    setSelectedSauceIds((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
 
-  const chosenSauces = sauces.filter((s) => s.id === selectedSauceId);
+  const chosenSauces = sauces.filter((s) => selectedSauceIds.includes(s.id));
   const unitPrice = product ? product.price + chosenSauces.reduce((n, s) => n + s.price, 0) : 0;
 
   return (
@@ -113,7 +112,7 @@ export default function ProductSheet({ product, onClose, onAdd }: Props) {
                   <p className="mb-3 text-xs font-bold uppercase tracking-wide text-zinc-400">Sauces</p>
                   <div className="flex flex-wrap gap-4">
                     {sauces.map((s) => {
-                      const active = s.id === selectedSauceId;
+                      const active = selectedSauceIds.includes(s.id);
                       return (
                         <button
                           key={s.id}
