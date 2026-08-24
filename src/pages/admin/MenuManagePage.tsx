@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Droplet, ImagePlus, Layers, Pencil, Plus, Trash2, X } from 'lucide-react';
-import type { Category, Product, ProductImage, Sauce, Supplement } from '../../lib/types';
+import type { Category, Product, ProductImage, Promotion, Sauce, Supplement } from '../../lib/types';
 import { api } from '../../lib/api';
 import supabase from '../../lib/supabase';
 import { money } from '../../lib/format';
@@ -22,9 +22,12 @@ export default function MenuManagePage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [sauces, setSauces] = useState<Sauce[]>([]);
   const [supplements, setSupplements] = useState<Supplement[]>([]);
+  const [promotions, setPromotions] = useState<Promotion[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [newCat, setNewCat] = useState({ name: '', icon: '🍽️' });
+  const [newCat, setNewCat] = useState({ name: '', icon: '🍽️', image_url: '' });
+  const [uploadingCategoryPhoto, setUploadingCategoryPhoto] = useState<'new' | number | null>(null);
+  const [uploadingPromotion, setUploadingPromotion] = useState(false);
   const [newSauce, setNewSauce] = useState({ name: '', price: '', image_url: '' });
   const [savingSauce, setSavingSauce] = useState(false);
   const [uploadingSaucePhoto, setUploadingSaucePhoto] = useState<'new' | number | null>(null);
@@ -59,12 +62,14 @@ export default function MenuManagePage() {
       fetch('/api/products').then((r) => r.json()),
       fetch('/api/sauces').then((r) => r.json()),
       fetch('/api/sauces?type=supplement').then((r) => r.json()),
+      fetch('/api/categories?type=promotion').then((r) => r.json()),
     ])
-      .then(([c, p, s, sup]) => {
+      .then(([c, p, s, sup, promos]) => {
         setCategories(Array.isArray(c) ? c : []);
         setProducts(Array.isArray(p) ? p : []);
         setSauces(Array.isArray(s) ? s : []);
         setSupplements(Array.isArray(sup) ? sup : []);
+        setPromotions(Array.isArray(promos) ? promos : []);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -162,7 +167,7 @@ export default function MenuManagePage() {
   const addCategory = async () => {
     if (!newCat.name.trim()) return;
     await api('/api/categories', { method: 'POST', body: JSON.stringify(newCat) }).catch(console.error);
-    setNewCat({ name: '', icon: '🍽️' });
+    setNewCat({ name: '', icon: '🍽️', image_url: '' });
     load();
   };
 
@@ -174,6 +179,87 @@ export default function MenuManagePage() {
   const removeCategory = async (c: Category) => {
     if (!confirm(`Delete category "${c.name}"? Its products will stay but become uncategorized.`)) return;
     await api('/api/categories', { method: 'DELETE', body: JSON.stringify({ id: c.id }) }).catch(console.error);
+    load();
+  };
+
+  /** Shared with both the "new category" form (target 'new') and an
+   *  existing category's own square swatch (target = that category's id). */
+  const uploadCategoryPhoto = async (file: File, target: 'new' | number) => {
+    setUploadingCategoryPhoto(target);
+    setError('');
+    try {
+      const base64: string = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result).split(',')[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ fileName: file.name, fileBase64: base64, contentType: file.type }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+
+      if (target === 'new') {
+        setNewCat((c) => ({ ...c, image_url: data.url }));
+      } else {
+        await api('/api/categories', { method: 'PUT', body: JSON.stringify({ id: target, image_url: data.url }) });
+        load();
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Category photo upload failed');
+    } finally {
+      setUploadingCategoryPhoto(null);
+    }
+  };
+
+  /** Promo banners have no separate "fill in a form, then save" step —
+   *  picking a file uploads it and creates the row in one go, since the
+   *  image is the only real field (any offer text lives inside the image
+   *  itself, there's nothing else to type). */
+  const uploadPromotionImage = async (file: File) => {
+    setUploadingPromotion(true);
+    setError('');
+    try {
+      const base64: string = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result).split(',')[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ fileName: file.name, fileBase64: base64, contentType: file.type }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+      await api('/api/categories', {
+        method: 'POST',
+        body: JSON.stringify({ type: 'promotion', image_url: data.url, sort_order: promotions.length }),
+      });
+      load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Banner upload failed');
+    } finally {
+      setUploadingPromotion(false);
+    }
+  };
+
+  const togglePromotionActive = async (p: Promotion) => {
+    await api('/api/categories', { method: 'PUT', body: JSON.stringify({ id: p.id, type: 'promotion', is_active: !p.is_active }) }).catch(console.error);
+    load();
+  };
+
+  const removePromotion = async (p: Promotion) => {
+    if (!confirm('Delete this promo banner?')) return;
+    await api('/api/categories', { method: 'DELETE', body: JSON.stringify({ id: p.id, type: 'promotion' }) }).catch(console.error);
     load();
   };
 
@@ -410,20 +496,92 @@ export default function MenuManagePage() {
 
       {/* categories */}
       <div className="mb-6 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-zinc-100">
-        <h2 className="mb-3 font-display text-sm font-bold text-zinc-900">Categories</h2>
+        <h2 className="mb-1 font-display text-sm font-bold text-zinc-900">Categories</h2>
+        <p className="mb-3 text-xs text-zinc-400">Shown as square icons above the product grid. Upload a photo for one, or leave it blank to show the emoji instead.</p>
         <div className="flex flex-wrap items-center gap-2">
           {categories.map((c) => (
-            <div key={c.id} className={`flex items-center gap-2 rounded-full border py-1.5 pl-3 pr-1.5 text-xs font-semibold ${c.is_active ? 'border-zinc-200 bg-white text-zinc-700' : 'border-dashed border-zinc-200 bg-zinc-50 text-zinc-400'}`}>
-              <span>{c.icon} {c.name}</span>
+            <div key={c.id} className={`flex items-center gap-2 rounded-full border py-1.5 pl-1.5 pr-1.5 text-xs font-semibold ${c.is_active ? 'border-zinc-200 bg-white text-zinc-700' : 'border-dashed border-zinc-200 bg-zinc-50 text-zinc-400'}`}>
+              <label className="group relative h-7 w-7 shrink-0 cursor-pointer" title="Click to upload a photo">
+                {c.image_url ? (
+                  <img src={c.image_url} alt="" className={`h-7 w-7 rounded-lg object-cover ring-1 ring-zinc-200 ${c.is_active ? '' : 'opacity-40 grayscale'}`} />
+                ) : (
+                  <span className={`flex h-7 w-7 items-center justify-center rounded-lg bg-zinc-50 text-sm ring-1 ring-zinc-200 ${c.is_active ? '' : 'opacity-40'}`}>{c.icon}</span>
+                )}
+                <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-zinc-900/0 text-transparent transition group-hover:bg-zinc-900/40 group-hover:text-white">
+                  {uploadingCategoryPhoto === c.id ? <span className="text-[8px] font-bold">…</span> : <Pencil size={10} />}
+                </div>
+                <input
+                  type="file"
+                  accept="image/*,.heic,.heif,.avif,.svg,.webp,.gif,.bmp,.tiff"
+                  className="hidden"
+                  onChange={(e) => e.target.files?.[0] && uploadCategoryPhoto(e.target.files[0], c.id)}
+                />
+              </label>
+              <span>{c.name}</span>
               <button onClick={() => toggleCategory(c)} title={c.is_active ? 'Deactivate' : 'Activate'} className={`h-2 w-2 rounded-full ${c.is_active ? 'bg-brand-500' : 'bg-zinc-300'}`} />
               <button onClick={() => removeCategory(c)} className="text-zinc-300 hover:text-red-500"><Trash2 size={12} /></button>
             </div>
           ))}
           <div className="flex items-center gap-1.5">
+            <label className="group relative h-7 w-7 shrink-0 cursor-pointer" title="Optional photo — the emoji shows if you skip this">
+              {newCat.image_url ? (
+                <img src={newCat.image_url} alt="" className="h-7 w-7 rounded-lg object-cover ring-1 ring-zinc-200" />
+              ) : (
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg border border-dashed border-zinc-300 text-zinc-300">
+                  <ImagePlus size={12} />
+                </span>
+              )}
+              <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-zinc-900/0 text-transparent transition group-hover:bg-zinc-900/40 group-hover:text-white">
+                {uploadingCategoryPhoto === 'new' ? <span className="text-[8px] font-bold">…</span> : <Pencil size={10} />}
+              </div>
+              <input
+                type="file"
+                accept="image/*,.heic,.heif,.avif,.svg,.webp,.gif,.bmp,.tiff"
+                className="hidden"
+                onChange={(e) => e.target.files?.[0] && uploadCategoryPhoto(e.target.files[0], 'new')}
+              />
+            </label>
             <input value={newCat.icon} onChange={(e) => setNewCat({ ...newCat, icon: e.target.value })} className="w-12 rounded-lg border border-zinc-200 px-2 py-1.5 text-center text-xs" maxLength={4} />
             <input value={newCat.name} onChange={(e) => setNewCat({ ...newCat, name: e.target.value })} placeholder="New category…" className="w-36 rounded-lg border border-zinc-200 px-3 py-1.5 text-xs outline-none focus:border-brand-400" />
             <button onClick={addCategory} className="rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-bold text-white hover:bg-zinc-800">Add</button>
           </div>
+        </div>
+      </div>
+
+      {/* promo banners */}
+      <div className="mb-6 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-zinc-100">
+        <h2 className="mb-1 font-display text-sm font-bold text-zinc-900">Promo banners</h2>
+        <p className="mb-3 text-xs text-zinc-400">Full-width images in a carousel under the top bar, above the categories — design any offer text into the picture itself. Hide one here to pull it from the e-menu without deleting it.</p>
+        <div className="flex flex-wrap items-start gap-3">
+          {promotions.map((p) => (
+            <div key={p.id} className="flex flex-col items-center gap-1.5">
+              <div className={`h-16 w-28 overflow-hidden rounded-xl ring-1 ring-zinc-200 ${p.is_active ? '' : 'opacity-40 grayscale'}`}>
+                <img src={p.image_url} alt="" className="h-full w-full object-cover" />
+              </div>
+              <div className="flex items-center gap-1.5">
+                <button onClick={() => togglePromotionActive(p)} title={p.is_active ? 'Hide from e-menu' : 'Show on e-menu'} className={`rounded-full px-2 py-0.5 text-[9px] font-bold ${p.is_active ? 'bg-brand-50 text-brand-700' : 'bg-zinc-100 text-zinc-400'}`}>
+                  {p.is_active ? 'Visible' : 'Hidden'}
+                </button>
+                <button onClick={() => removePromotion(p)} className="text-zinc-300 hover:text-red-500"><Trash2 size={11} /></button>
+              </div>
+            </div>
+          ))}
+          <label className="flex h-16 w-28 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-zinc-200 text-zinc-400 transition hover:border-brand-300 hover:text-brand-500">
+            {uploadingPromotion ? (
+              <span className="text-[10px] font-bold">Uploading…</span>
+            ) : (
+              <>
+                <ImagePlus size={16} />
+                <span className="text-[9px] font-bold">Add banner</span>
+              </>
+            )}
+            <input
+              type="file"
+              accept="image/*,.heic,.heif,.avif,.svg,.webp,.gif,.bmp,.tiff"
+              className="hidden"
+              onChange={(e) => e.target.files?.[0] && uploadPromotionImage(e.target.files[0])}
+            />
+          </label>
         </div>
       </div>
 
