@@ -116,41 +116,10 @@ export default function MenuPage() {
   return (
     <div className="min-h-screen bg-zinc-50 pb-36">
       <div className="mx-auto max-w-md px-4 md:max-w-3xl lg:max-w-5xl">
-        {/* promo banner carousel — scrolls away normally, unlike the header below */}
-        {promotions.length > 0 && (
-          <div className="pt-3">
-            <div
-              ref={bannerRef}
-              onScroll={(e) => {
-                const el = e.currentTarget;
-                setBannerIdx(Math.round(el.scrollLeft / el.clientWidth));
-              }}
-              className="no-scrollbar flex snap-x snap-mandatory overflow-x-auto rounded-2xl"
-            >
-              {promotions.map((p) => (
-                <img key={p.id} src={p.image_url} alt="" className="h-28 w-full shrink-0 snap-center rounded-2xl object-cover md:h-40" />
-              ))}
-            </div>
-            {promotions.length > 1 && (
-              <div className="mt-2 flex justify-center gap-1.5">
-                {promotions.map((p, i) => (
-                  <button
-                    key={p.id}
-                    onClick={() => {
-                      const el = bannerRef.current;
-                      if (el) el.scrollTo({ left: i * el.clientWidth, behavior: 'smooth' });
-                    }}
-                    aria-label={`Go to banner ${i + 1}`}
-                    className={`h-1.5 rounded-full transition-all ${i === bannerIdx ? 'w-4 bg-brand-500' : 'w-1.5 bg-zinc-200'}`}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* header */}
-        <header className="sticky top-0 z-30 -mx-4 border-b border-zinc-100 bg-white/90 px-4 pb-3 pt-4 backdrop-blur md:mx-0 md:px-0">
+        {/* header — sticky identity bar only (logo, name, language, cart). Kept
+            separate from the banner/categories below so it's always the very
+            first thing on screen, pinned, instead of the banner pushing it down. */}
+        <header className="sticky top-0 z-30 -mx-4 border-b border-zinc-100 bg-white/90 px-4 py-3 backdrop-blur md:mx-0 md:px-0">
           <div className="flex items-center gap-2.5">
             <div className={`flex h-11 w-11 shrink-0 items-center justify-center text-lg ${settings?.logo_url ? '' : 'rounded-xl bg-brand-500 shadow-sm shadow-orange-500/30'}`}>
               {settings?.logo_url ? (
@@ -189,48 +158,82 @@ export default function MenuPage() {
               </button>
             </div>
           </div>
-
-          {/* category rail — square icons; a category's own photo if set, else its emoji */}
-          <div className="no-scrollbar -mx-4 mt-3.5 flex gap-4 overflow-x-auto px-4 pb-1 md:mx-0 md:px-0">
-            <button onClick={() => setActiveCat('all')} className="flex shrink-0 flex-col items-center gap-1.5">
-              <span className={`flex h-12 w-12 items-center justify-center rounded-xl text-xl transition ${activeCat === 'all' ? 'bg-brand-50 ring-2 ring-brand-500' : 'bg-zinc-100'}`}>
-                ✨
-              </span>
-              <span className={`text-[10px] font-semibold ${activeCat === 'all' ? 'text-brand-600' : 'text-zinc-500'}`}>{t.all}</span>
-            </button>
-            {categories.filter((c) => c.is_active).map((c) => (
-              <button key={c.id} onClick={() => setActiveCat(c.id)} className="flex shrink-0 flex-col items-center gap-1.5">
-                <span className={`flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl text-xl transition ${activeCat === c.id ? 'bg-brand-50 ring-2 ring-brand-500' : 'bg-zinc-100'}`}>
-                  {c.image_url ? <img src={c.image_url} alt="" className="h-full w-full object-cover" /> : c.icon}
-                </span>
-                <span className={`max-w-[56px] truncate text-[10px] font-semibold ${activeCat === c.id ? 'text-brand-600' : 'text-zinc-500'}`}>
-                  {c.name}
-                </span>
-              </button>
-            ))}
-          </div>
-
-          {/* inline search — opened from the bottom nav */}
-          {searchOpen && (
-            <div className="mt-3">
-              <div className="flex items-center gap-2 rounded-full bg-zinc-100 px-3.5 py-2.5">
-                <Search size={16} className="shrink-0 text-zinc-400" />
-                <input
-                  autoFocus
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder={t.searchPlaceholder}
-                  className="flex-1 bg-transparent text-[13px] text-zinc-800 placeholder:text-zinc-400 focus:outline-none"
-                />
-                {search && (
-                  <button onClick={() => setSearch('')} className="shrink-0 text-zinc-400" aria-label="Clear search">
-                    <X size={14} />
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
         </header>
+
+        {/* promo banner carousel — right below the pinned header, scrolls away normally */}
+        {promotions.length > 0 && (
+          <div className="pt-3">
+            <div
+              ref={bannerRef}
+              onScroll={(e) => {
+                const el = e.currentTarget;
+                setBannerIdx(Math.round(el.scrollLeft / el.clientWidth));
+              }}
+              className="no-scrollbar flex snap-x snap-mandatory overflow-x-auto rounded-2xl"
+            >
+              {promotions.map((p) => (
+                <img key={p.id} src={p.image_url} alt="" className="h-28 w-full shrink-0 snap-center rounded-2xl object-cover md:h-40" />
+              ))}
+            </div>
+            {promotions.length > 1 && (
+              <div className="mt-2 flex justify-center gap-1.5">
+                {promotions.map((p, i) => (
+                  <button
+                    key={p.id}
+                    onClick={() => {
+                      const el = bannerRef.current;
+                      if (el) el.scrollTo({ left: i * el.clientWidth, behavior: 'smooth' });
+                    }}
+                    aria-label={`Go to banner ${i + 1}`}
+                    className={`h-1.5 rounded-full transition-all ${i === bannerIdx ? 'w-4 bg-brand-500' : 'w-1.5 bg-zinc-200'}`}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* category rail — square icons; scrolls away with the banner, not pinned */}
+        <div className="no-scrollbar -mx-4 mt-4 flex gap-4 overflow-x-auto px-4 pb-1 md:mx-0 md:px-0">
+          <button onClick={() => setActiveCat('all')} className="flex shrink-0 flex-col items-center gap-1.5">
+            <span className={`flex h-12 w-12 items-center justify-center rounded-xl text-xl transition ${activeCat === 'all' ? 'bg-brand-50 ring-2 ring-brand-500' : 'bg-zinc-100'}`}>
+              ✨
+            </span>
+            <span className={`text-[10px] font-semibold ${activeCat === 'all' ? 'text-brand-600' : 'text-zinc-500'}`}>{t.all}</span>
+          </button>
+          {categories.filter((c) => c.is_active).map((c) => (
+            <button key={c.id} onClick={() => setActiveCat(c.id)} className="flex shrink-0 flex-col items-center gap-1.5">
+              <span className={`flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl text-xl transition ${activeCat === c.id ? 'bg-brand-50 ring-2 ring-brand-500' : 'bg-zinc-100'}`}>
+                {c.image_url ? <img src={c.image_url} alt="" className="h-full w-full object-cover" /> : c.icon}
+              </span>
+              <span className={`max-w-[56px] truncate text-[10px] font-semibold ${activeCat === c.id ? 'text-brand-600' : 'text-zinc-500'}`}>
+                {c.name}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        {/* inline search — opened from the bottom nav, which also scrolls the
+            page back to the top so this is reachable even mid-scroll */}
+        {searchOpen && (
+          <div className="mt-3">
+            <div className="flex items-center gap-2 rounded-full bg-zinc-100 px-3.5 py-2.5">
+              <Search size={16} className="shrink-0 text-zinc-400" />
+              <input
+                autoFocus
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={t.searchPlaceholder}
+                className="flex-1 bg-transparent text-[13px] text-zinc-800 placeholder:text-zinc-400 focus:outline-none"
+              />
+              {search && (
+                <button onClick={() => setSearch('')} className="shrink-0 text-zinc-400" aria-label="Clear search">
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* product grid */}
         {loading ? (
@@ -269,7 +272,16 @@ export default function MenuPage() {
             <UtensilsCrossed size={19} className={!searchOpen ? 'text-zinc-900' : 'text-zinc-400'} />
             <span className={`text-[10px] font-semibold ${!searchOpen ? 'text-zinc-900' : 'text-zinc-400'}`}>{t.menu}</span>
           </button>
-          <button onClick={() => setSearchOpen((v) => !v)} className="flex flex-col items-center gap-0.5">
+          <button
+            onClick={() => {
+              setSearchOpen((v) => {
+                const next = !v;
+                if (next) window.scrollTo({ top: 0, behavior: 'smooth' });
+                return next;
+              });
+            }}
+            className="flex flex-col items-center gap-0.5"
+          >
             <Search size={19} className={searchOpen ? 'text-zinc-900' : 'text-zinc-400'} />
             <span className={`text-[10px] font-semibold ${searchOpen ? 'text-zinc-900' : 'text-zinc-400'}`}>{t.search}</span>
           </button>
