@@ -92,9 +92,9 @@ export default function MenuPage() {
         {/* header */}
         <header className="sticky top-0 z-30 -mx-4 border-b border-zinc-100 bg-white/90 px-4 pb-3 pt-4 backdrop-blur md:mx-0 md:px-0">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl bg-brand-500 text-lg shadow-sm shadow-orange-500/30">
+            <div className={`flex h-11 w-11 shrink-0 items-center justify-center text-lg ${settings?.logo_url ? '' : 'rounded-xl bg-brand-500 shadow-sm shadow-orange-500/30'}`}>
               {settings?.logo_url ? (
-                <img src={settings.logo_url} alt="" className="h-full w-full object-cover" />
+                <img src={settings.logo_url} alt="" className="h-full w-full object-contain" />
               ) : (
                 '🍽️'
               )}
