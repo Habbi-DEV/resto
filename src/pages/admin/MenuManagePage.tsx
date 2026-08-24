@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Droplet, ImagePlus, Layers, Pencil, Plus, Trash2, X } from 'lucide-react';
-import type { Category, Product, ProductImage, Promotion, Sauce, Supplement } from '../../lib/types';
+import type { Category, Product, ProductImage, Promotion, Sauce, Settings, Supplement } from '../../lib/types';
 import { api } from '../../lib/api';
 import supabase from '../../lib/supabase';
 import { money } from '../../lib/format';
+import { setCachedSettings, useSettings } from '../../lib/settings';
 import Modal from '../../components/ui/Modal';
 import Spinner from '../../components/ui/Spinner';
 
@@ -28,6 +29,8 @@ export default function MenuManagePage() {
   const [newCat, setNewCat] = useState({ name: '', icon: '🍽️', image_url: '' });
   const [uploadingCategoryPhoto, setUploadingCategoryPhoto] = useState<'new' | number | null>(null);
   const [uploadingPromotion, setUploadingPromotion] = useState(false);
+  const [uploadingAllIcon, setUploadingAllIcon] = useState(false);
+  const settings = useSettings();
   const [newSauce, setNewSauce] = useState({ name: '', price: '', image_url: '' });
   const [savingSauce, setSavingSauce] = useState(false);
   const [uploadingSaucePhoto, setUploadingSaucePhoto] = useState<'new' | number | null>(null);
@@ -180,6 +183,38 @@ export default function MenuManagePage() {
     if (!confirm(`Delete category "${c.name}"? Its products will stay but become uncategorized.`)) return;
     await api('/api/categories', { method: 'DELETE', body: JSON.stringify({ id: c.id }) }).catch(console.error);
     load();
+  };
+
+  /** "All" isn't a real category row, so its photo lives on settings
+   *  (all_category_image_url) instead of a per-category upload. Uses the
+   *  shared settings cache (setCachedSettings) so the change shows up live
+   *  on the e-menu too, same as a logo/name change on the Settings page. */
+  const uploadAllCategoryImage = async (file: File) => {
+    setUploadingAllIcon(true);
+    setError('');
+    try {
+      const base64: string = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result).split(',')[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ fileName: file.name, fileBase64: base64, contentType: file.type }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+      const updated = await api<Settings>('/api/settings', { method: 'PUT', body: JSON.stringify({ all_category_image_url: data.url }) });
+      if (updated) setCachedSettings(updated);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Upload failed');
+    } finally {
+      setUploadingAllIcon(false);
+    }
   };
 
   /** Shared with both the "new category" form (target 'new') and an
@@ -499,6 +534,25 @@ export default function MenuManagePage() {
         <h2 className="mb-1 font-display text-sm font-bold text-zinc-900">Categories</h2>
         <p className="mb-3 text-xs text-zinc-400">Shown as square icons above the product grid. Upload a photo for one, or leave it blank to show the emoji instead.</p>
         <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2 rounded-full border border-zinc-200 bg-white py-1.5 pl-1.5 pr-3 text-xs font-semibold text-zinc-700">
+            <label className="group relative h-7 w-7 shrink-0 cursor-pointer" title="Click to upload a photo for the All tile">
+              {settings?.all_category_image_url ? (
+                <img src={settings.all_category_image_url} alt="" className="h-7 w-7 rounded-lg object-cover ring-1 ring-zinc-200" />
+              ) : (
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-zinc-50 text-sm ring-1 ring-zinc-200">✨</span>
+              )}
+              <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-zinc-900/0 text-transparent transition group-hover:bg-zinc-900/40 group-hover:text-white">
+                {uploadingAllIcon ? <span className="text-[8px] font-bold">…</span> : <Pencil size={10} />}
+              </div>
+              <input
+                type="file"
+                accept="image/*,.heic,.heif,.avif,.svg,.webp,.gif,.bmp,.tiff"
+                className="hidden"
+                onChange={(e) => e.target.files?.[0] && uploadAllCategoryImage(e.target.files[0])}
+              />
+            </label>
+            <span>All</span>
+          </div>
           {categories.map((c) => (
             <div key={c.id} className={`flex items-center gap-2 rounded-full border py-1.5 pl-1.5 pr-1.5 text-xs font-semibold ${c.is_active ? 'border-zinc-200 bg-white text-zinc-700' : 'border-dashed border-zinc-200 bg-zinc-50 text-zinc-400'}`}>
               <label className="group relative h-7 w-7 shrink-0 cursor-pointer" title="Click to upload a photo">
