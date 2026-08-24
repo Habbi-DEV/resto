@@ -15,6 +15,19 @@ export interface Category {
   id: number;
   name: string;
   icon: string;
+  /** Optional photo for the square category icon on the e-menu — falls
+   *  back to `icon` (emoji) when not set. */
+  image_url: string | null;
+  sort_order: number;
+  is_active: boolean;
+}
+
+/** A banner in the promo/discount carousel shown under the top bar, above
+ *  the category rail. Image-only — any offer text is part of the uploaded
+ *  picture itself, there's no separate title/subtitle rendered on top. */
+export interface Promotion {
+  id: number;
+  image_url: string;
   sort_order: number;
   is_active: boolean;
 }
