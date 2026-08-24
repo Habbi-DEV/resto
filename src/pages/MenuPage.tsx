@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Bell, Search, ShoppingBag, ShoppingBasket, UtensilsCrossed, X } from 'lucide-react';
-import type { Category, Order, Product } from '../lib/types';
+import type { Category, Order, Product, Promotion } from '../lib/types';
 import { money } from './menu-helpers';
 import { useSettings } from '../lib/settings';
 import { useCartStore, selectCount, selectSubtotal } from '../stores/cartStore';
@@ -46,6 +46,7 @@ const STRINGS = {
 export default function MenuPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [promotions, setPromotions] = useState<Promotion[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeCat, setActiveCat] = useState<number | 'all'>('all');
   const [detail, setDetail] = useState<Product | null>(null);
@@ -53,6 +54,13 @@ export default function MenuPage() {
   const [lang, setLang] = useState<'en' | 'fr'>('en');
   const [searchOpen, setSearchOpen] = useState(false);
   const [search, setSearch] = useState('');
+
+  // Promo banner carousel: bannerIdx tracks the slide currently in view
+  // (updated both by manual swipe, via the container's own onScroll, and
+  // by the auto-advance timer below), bannerRef is used to scroll to a
+  // given slide from either the dots or the timer.
+  const [bannerIdx, setBannerIdx] = useState(0);
+  const bannerRef = useRef<HTMLDivElement>(null);
 
   // The last placed order and whether its tracker is currently shown are
   // kept separate: closing the tracker (via its own X, or by tapping the
@@ -68,16 +76,35 @@ export default function MenuPage() {
   const add = useCartStore((s) => s.add);
 
   useEffect(() => {
-    Promise.all([fetch('/api/categories').then((r) => r.json()), fetch('/api/products').then((r) => r.json())])
-      .then(([cats, prods]) => {
+    Promise.all([
+      fetch('/api/categories').then((r) => r.json()),
+      fetch('/api/products').then((r) => r.json()),
+      fetch('/api/categories?type=promotion&active=1').then((r) => r.json()),
+    ])
+      .then(([cats, prods, promos]) => {
         // Keep the full list (including inactive categories) for the chip
         // strip's own bookkeeping — it filters to active ones itself.
         setCategories(Array.isArray(cats) ? cats : []);
         setProducts(Array.isArray(prods) ? prods : []);
+        setPromotions(Array.isArray(promos) ? promos : []);
       })
       .catch((e) => console.error('menu load failed', e))
       .finally(() => setLoading(false));
   }, []);
+
+  // Auto-advance the banner carousel every 4.5s. Restarting on every
+  // bannerIdx change (not just on mount) means a manual swipe or a dot tap
+  // resets the countdown instead of fighting the timer's own scroll.
+  useEffect(() => {
+    if (promotions.length < 2) return;
+    const id = setInterval(() => {
+      const el = bannerRef.current;
+      if (!el) return;
+      const next = (bannerIdx + 1) % promotions.length;
+      el.scrollTo({ left: next * el.clientWidth, behavior: 'smooth' });
+    }, 4500);
+    return () => clearInterval(id);
+  }, [bannerIdx, promotions.length]);
 
   const visible = useMemo(() => {
     const sorted = [...products].sort((a, b) => a.name.localeCompare(b.name));
@@ -89,6 +116,39 @@ export default function MenuPage() {
   return (
     <div className="min-h-screen bg-zinc-50 pb-36">
       <div className="mx-auto max-w-md px-4 md:max-w-3xl lg:max-w-5xl">
+        {/* promo banner carousel — scrolls away normally, unlike the header below */}
+        {promotions.length > 0 && (
+          <div className="pt-3">
+            <div
+              ref={bannerRef}
+              onScroll={(e) => {
+                const el = e.currentTarget;
+                setBannerIdx(Math.round(el.scrollLeft / el.clientWidth));
+              }}
+              className="no-scrollbar flex snap-x snap-mandatory overflow-x-auto rounded-2xl"
+            >
+              {promotions.map((p) => (
+                <img key={p.id} src={p.image_url} alt="" className="h-28 w-full shrink-0 snap-center rounded-2xl object-cover md:h-40" />
+              ))}
+            </div>
+            {promotions.length > 1 && (
+              <div className="mt-2 flex justify-center gap-1.5">
+                {promotions.map((p, i) => (
+                  <button
+                    key={p.id}
+                    onClick={() => {
+                      const el = bannerRef.current;
+                      if (el) el.scrollTo({ left: i * el.clientWidth, behavior: 'smooth' });
+                    }}
+                    aria-label={`Go to banner ${i + 1}`}
+                    className={`h-1.5 rounded-full transition-all ${i === bannerIdx ? 'w-4 bg-brand-500' : 'w-1.5 bg-zinc-200'}`}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* header */}
         <header className="sticky top-0 z-30 -mx-4 border-b border-zinc-100 bg-white/90 px-4 pb-3 pt-4 backdrop-blur md:mx-0 md:px-0">
           <div className="flex items-center gap-2.5">
@@ -130,18 +190,18 @@ export default function MenuPage() {
             </div>
           </div>
 
-          {/* category rail */}
+          {/* category rail — square icons; a category's own photo if set, else its emoji */}
           <div className="no-scrollbar -mx-4 mt-3.5 flex gap-4 overflow-x-auto px-4 pb-1 md:mx-0 md:px-0">
             <button onClick={() => setActiveCat('all')} className="flex shrink-0 flex-col items-center gap-1.5">
-              <span className={`flex h-12 w-12 items-center justify-center rounded-full text-xl transition ${activeCat === 'all' ? 'bg-brand-50 ring-2 ring-brand-500' : 'bg-zinc-100'}`}>
+              <span className={`flex h-12 w-12 items-center justify-center rounded-xl text-xl transition ${activeCat === 'all' ? 'bg-brand-50 ring-2 ring-brand-500' : 'bg-zinc-100'}`}>
                 ✨
               </span>
               <span className={`text-[10px] font-semibold ${activeCat === 'all' ? 'text-brand-600' : 'text-zinc-500'}`}>{t.all}</span>
             </button>
             {categories.filter((c) => c.is_active).map((c) => (
               <button key={c.id} onClick={() => setActiveCat(c.id)} className="flex shrink-0 flex-col items-center gap-1.5">
-                <span className={`flex h-12 w-12 items-center justify-center rounded-full text-xl transition ${activeCat === c.id ? 'bg-brand-50 ring-2 ring-brand-500' : 'bg-zinc-100'}`}>
-                  {c.icon}
+                <span className={`flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl text-xl transition ${activeCat === c.id ? 'bg-brand-50 ring-2 ring-brand-500' : 'bg-zinc-100'}`}>
+                  {c.image_url ? <img src={c.image_url} alt="" className="h-full w-full object-cover" /> : c.icon}
                 </span>
                 <span className={`max-w-[56px] truncate text-[10px] font-semibold ${activeCat === c.id ? 'text-brand-600' : 'text-zinc-500'}`}>
                   {c.name}
