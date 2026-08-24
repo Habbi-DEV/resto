@@ -169,7 +169,7 @@ export default function MenuPage() {
                 const el = e.currentTarget;
                 setBannerIdx(Math.round(el.scrollLeft / el.clientWidth));
               }}
-              className="no-scrollbar flex snap-x snap-mandatory overflow-x-auto rounded-2xl"
+              className="no-scrollbar flex snap-x snap-mandatory overflow-x-auto rounded-2xl bg-white"
             >
               {promotions.map((p) => (
                 <img key={p.id} src={p.image_url} alt="" className="h-28 w-full shrink-0 snap-center rounded-2xl object-cover md:h-40" />
@@ -193,17 +193,40 @@ export default function MenuPage() {
           </div>
         )}
 
-        {/* category rail — square icons; scrolls away with the banner, not pinned */}
-        <div className="no-scrollbar -mx-4 mt-4 flex gap-4 overflow-x-auto px-4 pb-1 md:mx-0 md:px-0">
+        {/* category rail — square icons; scrolls away with the banner, not
+            pinned. Extra top padding keeps the selection ring's box-shadow
+            from being clipped by the scroll container (overflow-x-auto also
+            clips the y-axis unless it has room to spare). */}
+        <div className="no-scrollbar -mx-4 mt-4 flex gap-4 overflow-x-auto px-4 pb-1 pt-2 md:mx-0 md:px-0">
           <button onClick={() => setActiveCat('all')} className="flex shrink-0 flex-col items-center gap-1.5">
-            <span className={`flex h-12 w-12 items-center justify-center rounded-xl text-xl transition ${activeCat === 'all' ? 'bg-brand-50 ring-2 ring-brand-500' : 'bg-zinc-100'}`}>
-              ✨
+            <span
+              className={`flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl text-xl transition ${
+                settings?.all_category_image_url
+                  ? `bg-white ${activeCat === 'all' ? 'ring-2 ring-brand-500' : 'ring-1 ring-zinc-200'}`
+                  : activeCat === 'all'
+                    ? 'bg-brand-50 ring-2 ring-brand-500'
+                    : 'bg-zinc-100'
+              }`}
+            >
+              {settings?.all_category_image_url ? (
+                <img src={settings.all_category_image_url} alt="" className="h-full w-full object-cover" />
+              ) : (
+                '✨'
+              )}
             </span>
             <span className={`text-[10px] font-semibold ${activeCat === 'all' ? 'text-brand-600' : 'text-zinc-500'}`}>{t.all}</span>
           </button>
           {categories.filter((c) => c.is_active).map((c) => (
             <button key={c.id} onClick={() => setActiveCat(c.id)} className="flex shrink-0 flex-col items-center gap-1.5">
-              <span className={`flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl text-xl transition ${activeCat === c.id ? 'bg-brand-50 ring-2 ring-brand-500' : 'bg-zinc-100'}`}>
+              <span
+                className={`flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl text-xl transition ${
+                  c.image_url
+                    ? `bg-white ${activeCat === c.id ? 'ring-2 ring-brand-500' : 'ring-1 ring-zinc-200'}`
+                    : activeCat === c.id
+                      ? 'bg-brand-50 ring-2 ring-brand-500'
+                      : 'bg-zinc-100'
+                }`}
+              >
                 {c.image_url ? <img src={c.image_url} alt="" className="h-full w-full object-cover" /> : c.icon}
               </span>
               <span className={`max-w-[56px] truncate text-[10px] font-semibold ${activeCat === c.id ? 'text-brand-600' : 'text-zinc-500'}`}>
