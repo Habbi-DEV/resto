@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import supabase from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { useSettings } from '../../lib/settings';
 import type { Stats } from '../../lib/types';
 
 const NAV = [
@@ -24,11 +25,14 @@ const NAV = [
 ];
 
 function Brand() {
+  const settings = useSettings();
   return (
     <div className="flex items-center gap-2.5">
-      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-500 text-lg shadow-md shadow-orange-500/40">🍽️</div>
+      <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl bg-brand-500 text-lg shadow-md shadow-orange-500/40">
+        {settings?.logo_url ? <img src={settings.logo_url} alt="" className="h-full w-full object-cover" /> : '🍽️'}
+      </div>
       <div>
-        <p className="font-display text-[15px] font-extrabold leading-none text-white">Restolink</p>
+        <p className="font-display text-[15px] font-extrabold leading-none text-white">{settings?.restaurant_name || 'Restolink'}</p>
         <p className="text-[10px] font-medium tracking-wide text-zinc-500">POS · RMS</p>
       </div>
     </div>
