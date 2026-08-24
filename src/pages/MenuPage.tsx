@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Bell, Search, ShoppingBag, ShoppingBasket, UtensilsCrossed, X } from 'lucide-react';
 import type { Category, Order, Product } from '../lib/types';
 import { money } from './menu-helpers';
+import { useSettings } from '../lib/settings';
 import { useCartStore, selectCount, selectSubtotal } from '../stores/cartStore';
 import ProductCard from '../components/customer/ProductCard';
 import ProductSheet from '../components/customer/ProductSheet';
@@ -61,6 +62,7 @@ export default function MenuPage() {
   const [orderUnseen, setOrderUnseen] = useState(false);
 
   const t = STRINGS[lang];
+  const settings = useSettings();
   const count = useCartStore(selectCount);
   const subtotal = useCartStore(selectSubtotal);
   const add = useCartStore((s) => s.add);
@@ -90,8 +92,14 @@ export default function MenuPage() {
         {/* header */}
         <header className="sticky top-0 z-30 -mx-4 border-b border-zinc-100 bg-white/90 px-4 pb-3 pt-4 backdrop-blur md:mx-0 md:px-0">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-500 text-lg shadow-sm shadow-orange-500/30">🍽️</div>
-            <h1 className="font-display text-[17px] font-extrabold tracking-tight text-zinc-900">Restolink</h1>
+            <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl bg-brand-500 text-lg shadow-sm shadow-orange-500/30">
+              {settings?.logo_url ? (
+                <img src={settings.logo_url} alt="" className="h-full w-full object-cover" />
+              ) : (
+                '🍽️'
+              )}
+            </div>
+            <h1 className="font-display text-[17px] font-extrabold tracking-tight text-zinc-900">{settings?.restaurant_name || 'Restolink'}</h1>
             <div className="ml-auto flex items-center gap-2">
               <div className="flex rounded-full bg-zinc-100 p-0.5">
                 <button
