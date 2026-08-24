@@ -48,7 +48,7 @@ export default async function handler(req, res) {
       const fields = {};
 
       // Strings — trimmed, empty string allowed (e.g. clearing the logo).
-      for (const key of ['restaurant_name', 'address', 'phone', 'contact_email', 'opening_hours', 'logo_url', 'brand_color']) {
+      for (const key of ['restaurant_name', 'address', 'phone', 'contact_email', 'opening_hours', 'logo_url', 'brand_color', 'all_category_image_url']) {
         if (body[key] != null) fields[key] = String(body[key]).trim();
       }
 
