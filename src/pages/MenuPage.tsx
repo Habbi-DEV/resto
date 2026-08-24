@@ -172,7 +172,7 @@ export default function MenuPage() {
               className="no-scrollbar flex snap-x snap-mandatory overflow-x-auto rounded-2xl bg-white"
             >
               {promotions.map((p) => (
-                <img key={p.id} src={p.image_url} alt="" className="h-28 w-full shrink-0 snap-center rounded-2xl object-cover md:h-40" />
+                <img key={p.id} src={p.image_url} alt="" className="aspect-[2/1] w-full shrink-0 snap-center rounded-2xl object-cover" />
               ))}
             </div>
             {promotions.length > 1 && (
