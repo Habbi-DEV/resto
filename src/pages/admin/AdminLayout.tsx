@@ -28,8 +28,8 @@ function Brand() {
   const settings = useSettings();
   return (
     <div className="flex items-center gap-2.5">
-      <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl bg-brand-500 text-lg shadow-md shadow-orange-500/40">
-        {settings?.logo_url ? <img src={settings.logo_url} alt="" className="h-full w-full object-cover" /> : '🍽️'}
+      <div className={`flex h-11 w-11 shrink-0 items-center justify-center text-lg ${settings?.logo_url ? '' : 'rounded-xl bg-brand-500 shadow-md shadow-orange-500/40'}`}>
+        {settings?.logo_url ? <img src={settings.logo_url} alt="" className="h-full w-full object-contain" /> : '🍽️'}
       </div>
       <div>
         <p className="font-display text-[15px] font-extrabold leading-none text-white">{settings?.restaurant_name || 'Restolink'}</p>
