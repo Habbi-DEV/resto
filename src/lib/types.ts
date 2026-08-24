@@ -156,6 +156,10 @@ export interface Settings {
   id: number;
   restaurant_name: string;
   logo_url: string;
+  /** Optional photo for the "All" tile in the e-menu category rail — falls
+   *  back to the ✨ emoji when not set. Lives here (not on a category row)
+   *  because "All" isn't a real category. */
+  all_category_image_url: string | null;
   address: string;
   phone: string;
   contact_email: string;
