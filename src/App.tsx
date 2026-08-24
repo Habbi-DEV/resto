@@ -18,9 +18,13 @@ import { loadSettings } from './lib/settings';
 export default function App() {
   // Loaded once at the root so money() (used on both the public e-menu and
   // the admin dashboard) has the real currency as early as possible. Until
-  // this resolves, money() falls back to EUR.
+  // this resolves, money() falls back to EUR. Also syncs the browser tab
+  // title to the configured restaurant name, so a rename in Settings shows
+  // up there too, not just in the header/sidebar.
   useEffect(() => {
-    loadSettings();
+    loadSettings().then((s) => {
+      if (s?.restaurant_name) document.title = s.restaurant_name;
+    });
   }, []);
 
   return (
