@@ -3,26 +3,9 @@ import { CheckCircle2, Printer, XCircle } from 'lucide-react';
 import type { Order, OrderStatus } from '../../lib/types';
 import { orderNumber } from '../../lib/format';
 import { printInvoice } from '../../lib/invoice';
+import { ORDER_STATUS_HINT, ORDER_STATUS_LABEL } from '../../lib/orderStatus';
 
 const STEPS: OrderStatus[] = ['pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery', 'completed'];
-
-const LABEL: Record<string, string> = {
-  pending: 'Order received',
-  confirmed: 'Confirmed',
-  preparing: 'In the kitchen',
-  ready: 'Ready',
-  out_for_delivery: 'On the way',
-  completed: 'Served',
-};
-
-const HINT: Record<string, string> = {
-  pending: 'Waiting for the restaurant to confirm your order…',
-  confirmed: 'Your order has been accepted 👍',
-  preparing: 'The kitchen is on it 👨‍🍳',
-  ready: 'Ready! We will bring it to your table shortly.',
-  out_for_delivery: 'Your courier is on the way 🛵',
-  completed: 'Enjoy your meal! Bon appétit 🧡',
-};
 
 interface Props {
   order: Order;
@@ -83,7 +66,7 @@ export default function OrderTracker({ order: initial, onClose, onUpdate }: Prop
         {!cancelled && (
           <>
             <div className="mt-8 rounded-2xl bg-brand-50 p-4 text-center text-sm font-medium text-brand-800">
-              {HINT[order.status]}
+              {ORDER_STATUS_HINT[order.status]}
             </div>
 
             <div className="mt-8 flex-1">
@@ -104,7 +87,7 @@ export default function OrderTracker({ order: initial, onClose, onUpdate }: Prop
                     </div>
                     <div className="pb-6 pt-1">
                       <p className={`text-sm font-semibold ${done ? 'text-zinc-900' : 'text-zinc-400'}`}>
-                        {LABEL[s]}
+                        {ORDER_STATUS_LABEL[s]}
                       </p>
                       {i === currentIdx && (
                         <p className="text-xs font-medium text-brand-600">Current step · live</p>

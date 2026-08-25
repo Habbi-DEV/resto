@@ -75,6 +75,13 @@ export default function CartSheet({ open, onClose, onPlaced }: Props) {
 
   const placeOrder = async () => {
     if (!validate()) return;
+    // Asked here (not on page load) so it's tied to a real click and to a
+    // moment that actually explains why: they're placing an order we could
+    // notify them about. Fire-and-forget — doesn't block submission, and a
+    // "default" (undecided) check means we never re-prompt after a Block.
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission().catch(() => {});
+    }
     setPlacing(true);
     setServerError('');
     try {
