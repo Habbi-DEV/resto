@@ -11,6 +11,8 @@ import ProductSheet from '../components/customer/ProductSheet';
 import CartSheet from '../components/customer/CartSheet';
 import OrderTracker from '../components/customer/OrderTracker';
 import Spinner from '../components/ui/Spinner';
+import { playChime, unlockChime } from '../lib/chime';
+import { ORDER_STATUS_HINT, ORDER_STATUS_LABEL } from '../lib/orderStatus';
 
 // Small, self-contained dictionary for the fixed shell text on this page
 // Persists the last placed order's id across a page reload/close, purely
@@ -126,6 +128,15 @@ export default function MenuPage() {
       .catch(() => localStorage.removeItem(LAST_ORDER_KEY));
   }, []);
 
+  // Browsers block audio that starts without a user gesture, and the chime
+  // plays from a background timer (not a click) — so unlock it on whatever
+  // the person taps first, well before any status change could need it.
+  useEffect(() => {
+    const unlock = () => unlockChime();
+    window.addEventListener('pointerdown', unlock, { once: true });
+    return () => window.removeEventListener('pointerdown', unlock);
+  }, []);
+
   // Keeps the bell honest while the tracker itself is closed: OrderTracker
   // already polls every 3s (and reports back via onUpdate) whenever it's
   // open, so this only needs to run the rest of the time. Checks every 15s
@@ -148,13 +159,29 @@ export default function MenuPage() {
         if (updated.status !== order.status) {
           setOrder(updated);
           setOrderUnseen(true);
+          playChime();
+          if ('Notification' in window && Notification.permission === 'granted') {
+            const n = new Notification(settings?.restaurant_name || 'Restolink', {
+              body: [ORDER_STATUS_LABEL[updated.status], ORDER_STATUS_HINT[updated.status]].filter(Boolean).join(' — '),
+              icon: settings?.logo_url || '/favicon.svg',
+              // Replaces any earlier notification for this same order
+              // instead of stacking one per status change.
+              tag: `order-${updated.id}`,
+            });
+            n.onclick = () => {
+              window.focus();
+              setTrackerOpen(true);
+              setOrderUnseen(false);
+              n.close();
+            };
+          }
         }
       } catch {
         /* transient network hiccup — try again next tick */
       }
     }, 15000);
     return () => clearInterval(id);
-  }, [order, trackerOpen]);
+  }, [order, trackerOpen, settings?.restaurant_name, settings?.logo_url]);
 
   const visible = useMemo(() => {
     const sorted = [...products].sort((a, b) => a.name.localeCompare(b.name));
