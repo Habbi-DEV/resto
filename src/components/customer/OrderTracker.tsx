@@ -27,22 +27,31 @@ const HINT: Record<string, string> = {
 interface Props {
   order: Order;
   onClose: () => void;
+  /** Called with the freshly-polled order on every successful check, so a
+   *  parent tracking its own copy of the order (for the notification bell,
+   *  say) stays in sync even while this tracker is the one doing the
+   *  polling. Optional so this component still works standalone. */
+  onUpdate?: (order: Order) => void;
 }
 
-export default function OrderTracker({ order: initial, onClose }: Props) {
+export default function OrderTracker({ order: initial, onClose, onUpdate }: Props) {
   const [order, setOrder] = useState<Order>(initial);
 
   useEffect(() => {
     const iv = setInterval(async () => {
       try {
         const res = await fetch(`/api/orders?id=${initial.id}`);
-        if (res.ok) setOrder(await res.json());
+        if (res.ok) {
+          const fresh = await res.json();
+          setOrder(fresh);
+          onUpdate?.(fresh);
+        }
       } catch {
         /* keep last known state */
       }
     }, 3000);
     return () => clearInterval(iv);
-  }, [initial.id]);
+  }, [initial.id, onUpdate]);
 
   const cancelled = order.status === 'cancelled';
   const steps = STEPS.filter((s) => s !== 'out_for_delivery' || order.order_type === 'delivery');
