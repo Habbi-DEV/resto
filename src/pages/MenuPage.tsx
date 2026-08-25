@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Bell, Search, ShoppingBag, ShoppingBasket, UtensilsCrossed, X } from 'lucide-react';
 import type { Category, Order, Product, Promotion } from '../lib/types';
+import { ACTIVE_STATUSES } from '../lib/types';
 import { money } from './menu-helpers';
 import { useSettings } from '../lib/settings';
 import { useCartStore, selectCount, selectSubtotal } from '../stores/cartStore';
@@ -12,6 +13,12 @@ import OrderTracker from '../components/customer/OrderTracker';
 import Spinner from '../components/ui/Spinner';
 
 // Small, self-contained dictionary for the fixed shell text on this page
+// Persists the last placed order's id across a page reload/close, purely
+// client-side (there's no customer login to key this off of). Only the id
+// is stored — the actual order data is always re-fetched fresh from the
+// server, never trusted from storage.
+const LAST_ORDER_KEY = 'restolink:lastOrderId';
+
 // only (header, nav, loading/empty states, search). Category and product
 // names come from the admin panel and are shown as entered — there's no
 // stored translation for them, so they don't switch with the toggle.
@@ -105,6 +112,49 @@ export default function MenuPage() {
     }, 4500);
     return () => clearInterval(id);
   }, [bannerIdx, promotions.length]);
+
+  // Restores the notification bell across a page reload: if a previous
+  // session left an order id behind, fetch its current status so the bell
+  // lights up again immediately, without waiting for the next poll tick.
+  // No `orderUnseen` here — restoring silently isn't a new notification.
+  useEffect(() => {
+    const storedId = localStorage.getItem(LAST_ORDER_KEY);
+    if (!storedId) return;
+    fetch(`/api/orders?id=${storedId}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((o: Order) => setOrder(o))
+      .catch(() => localStorage.removeItem(LAST_ORDER_KEY));
+  }, []);
+
+  // Keeps the bell honest while the tracker itself is closed: OrderTracker
+  // already polls every 3s (and reports back via onUpdate) whenever it's
+  // open, so this only needs to run the rest of the time. Checks every 15s
+  // — frequent enough to notice a status change without hammering the API
+  // — and stops on its own once the order reaches a terminal status, since
+  // nothing more can change after that.
+  useEffect(() => {
+    if (!order || trackerOpen || !ACTIVE_STATUSES.includes(order.status)) return;
+    const id = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/orders?id=${order.id}`);
+        if (!res.ok) {
+          // Order no longer exists (e.g. test data was reset) — stop
+          // pestering the server about it and clear the stale bell.
+          localStorage.removeItem(LAST_ORDER_KEY);
+          setOrder(null);
+          return;
+        }
+        const updated: Order = await res.json();
+        if (updated.status !== order.status) {
+          setOrder(updated);
+          setOrderUnseen(true);
+        }
+      } catch {
+        /* transient network hiccup — try again next tick */
+      }
+    }, 15000);
+    return () => clearInterval(id);
+  }, [order, trackerOpen]);
 
   const visible = useMemo(() => {
     const sorted = [...products].sort((a, b) => a.name.localeCompare(b.name));
@@ -333,9 +383,10 @@ export default function MenuPage() {
           setOrder(o);
           setTrackerOpen(true);
           setOrderUnseen(true);
+          localStorage.setItem(LAST_ORDER_KEY, String(o.id));
         }}
       />
-      {order && trackerOpen && <OrderTracker order={order} onClose={() => setTrackerOpen(false)} />}
+      {order && trackerOpen && <OrderTracker order={order} onClose={() => setTrackerOpen(false)} onUpdate={setOrder} />}
     </div>
   );
 }
