@@ -3,46 +3,40 @@ import { CheckCircle2, Printer, XCircle } from 'lucide-react';
 import type { Order, OrderStatus } from '../../lib/types';
 import { orderNumber } from '../../lib/format';
 import { printInvoice } from '../../lib/invoice';
+import { ORDER_STATUS_HINT, ORDER_STATUS_LABEL } from '../../lib/orderStatus';
+import { useLang } from '../../lib/i18n';
 
 const STEPS: OrderStatus[] = ['pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery', 'completed'];
-
-const LABEL: Record<string, string> = {
-  pending: 'Order received',
-  confirmed: 'Confirmed',
-  preparing: 'In the kitchen',
-  ready: 'Ready',
-  out_for_delivery: 'On the way',
-  completed: 'Served',
-};
-
-const HINT: Record<string, string> = {
-  pending: 'Waiting for the restaurant to confirm your order…',
-  confirmed: 'Your order has been accepted 👍',
-  preparing: 'The kitchen is on it 👨‍🍳',
-  ready: 'Ready! We will bring it to your table shortly.',
-  out_for_delivery: 'Your courier is on the way 🛵',
-  completed: 'Enjoy your meal! Bon appétit 🧡',
-};
 
 interface Props {
   order: Order;
   onClose: () => void;
+  /** Called with the freshly-polled order on every successful check, so a
+   *  parent tracking its own copy of the order (for the notification bell,
+   *  say) stays in sync even while this tracker is the one doing the
+   *  polling. Optional so this component still works standalone. */
+  onUpdate?: (order: Order) => void;
 }
 
-export default function OrderTracker({ order: initial, onClose }: Props) {
+export default function OrderTracker({ order: initial, onClose, onUpdate }: Props) {
+  const { t } = useLang();
   const [order, setOrder] = useState<Order>(initial);
 
   useEffect(() => {
     const iv = setInterval(async () => {
       try {
         const res = await fetch(`/api/orders?id=${initial.id}`);
-        if (res.ok) setOrder(await res.json());
+        if (res.ok) {
+          const fresh = await res.json();
+          setOrder(fresh);
+          onUpdate?.(fresh);
+        }
       } catch {
         /* keep last known state */
       }
     }, 3000);
     return () => clearInterval(iv);
-  }, [initial.id]);
+  }, [initial.id, onUpdate]);
 
   const cancelled = order.status === 'cancelled';
   const steps = STEPS.filter((s) => s !== 'out_for_delivery' || order.order_type === 'delivery');
@@ -62,19 +56,19 @@ export default function OrderTracker({ order: initial, onClose }: Props) {
             </div>
           )}
           <h2 className="mt-5 font-display text-2xl font-bold text-zinc-900">
-            {cancelled ? 'Order cancelled' : 'Order placed!'}
+            {cancelled ? t('shop.order_cancelled') : t('shop.order_placed')}
           </h2>
           <p className="mt-1 text-sm text-zinc-500">
             {cancelled
-              ? 'The restaurant had to cancel this order. Please ask our staff for help.'
-              : `Your order ${orderNumber(order.id)} is being processed.`}
+              ? t('shop.order_cancelled_desc')
+              : t('shop.order_processing', { id: orderNumber(order.id) })}
           </p>
         </div>
 
         {!cancelled && (
           <>
             <div className="mt-8 rounded-2xl bg-brand-50 p-4 text-center text-sm font-medium text-brand-800">
-              {HINT[order.status]}
+              {ORDER_STATUS_HINT[order.status]}
             </div>
 
             <div className="mt-8 flex-1">
@@ -95,10 +89,10 @@ export default function OrderTracker({ order: initial, onClose }: Props) {
                     </div>
                     <div className="pb-6 pt-1">
                       <p className={`text-sm font-semibold ${done ? 'text-zinc-900' : 'text-zinc-400'}`}>
-                        {LABEL[s]}
+                        {ORDER_STATUS_LABEL[s]}
                       </p>
                       {i === currentIdx && (
-                        <p className="text-xs font-medium text-brand-600">Current step · live</p>
+                        <p className="text-xs font-medium text-brand-600">{t('shop.current_step_live')}</p>
                       )}
                     </div>
                   </div>
@@ -112,13 +106,13 @@ export default function OrderTracker({ order: initial, onClose }: Props) {
           onClick={() => printInvoice(order)}
           className="mt-8 flex w-full items-center justify-center gap-2 rounded-full border-2 border-zinc-200 py-3.5 font-display text-[15px] font-bold text-zinc-700 transition hover:bg-zinc-50 active:scale-[0.98]"
         >
-          <Printer size={17} /> Print receipt
+          <Printer size={17} /> {t('shop.print_receipt')}
         </button>
         <button
           onClick={onClose}
           className="mt-3 w-full rounded-full bg-zinc-900 py-3.5 font-display text-[15px] font-bold text-white transition hover:bg-zinc-800 active:scale-[0.98]"
         >
-          Back to menu
+          {t('shop.back_to_menu')}
         </button>
       </div>
     </div>

@@ -15,6 +15,19 @@ export interface Category {
   id: number;
   name: string;
   icon: string;
+  /** Optional photo for the square category icon on the e-menu — falls
+   *  back to `icon` (emoji) when not set. */
+  image_url: string | null;
+  sort_order: number;
+  is_active: boolean;
+}
+
+/** A banner in the promo/discount carousel shown under the top bar, above
+ *  the category rail. Image-only — any offer text is part of the uploaded
+ *  picture itself, there's no separate title/subtitle rendered on top. */
+export interface Promotion {
+  id: number;
+  image_url: string;
   sort_order: number;
   is_active: boolean;
 }
@@ -111,7 +124,10 @@ export interface Order {
   delivery_address: string | null;
   notes: string | null;
   subtotal: number;
-  tax_amount: number;
+  /** Snapshot of settings.delivery_fee at order time (0 unless order_type
+   *  is 'delivery'), so historical totals stay correct even if the fee
+   *  changes later in Settings. */
+  delivery_fee: number;
   total: number;
   payment_method: string;
   created_at: string;
@@ -137,22 +153,20 @@ export interface Stats {
   by_type: Record<OrderType, number>;
 }
 
-export type Currency = 'EUR' | 'USD' | 'MAD' | 'DZD';
-
 export interface Settings {
   id: number;
   restaurant_name: string;
   logo_url: string;
+  /** Optional photo for the "All" tile in the e-menu category rail — falls
+   *  back to the ✨ emoji when not set. Lives here (not on a category row)
+   *  because "All" isn't a real category. */
+  all_category_image_url: string | null;
   address: string;
   phone: string;
   contact_email: string;
   opening_hours: string;
-  currency: Currency;
-  tax_rate: number;
   delivery_fee: number;
   delivery_min_order: number;
-  payment_cash_enabled: boolean;
-  payment_card_enabled: boolean;
   new_order_sound_enabled: boolean;
   low_stock_threshold: number;
   brand_color: string;

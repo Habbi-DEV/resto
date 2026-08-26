@@ -1,33 +1,32 @@
-import { getCachedSettings } from './settings';
+import { getCurrentLang } from './i18n';
 
-// Symbol/label shown before the amount. DH and DA read a little oddly as a
-// prefix (they're usually written after the number), but a single prefix
-// format keeps every call site simple for v1 — this is the one place to
-// change if that's revisited.
-const CURRENCY_SYMBOLS: Record<string, string> = {
-  EUR: '€', USD: '$', MAD: 'DH', DZD: 'DA',
-};
-
-// Falls back to € whenever settings haven't loaded yet (e.g. very first
-// paint before loadSettings() resolves in App.tsx) or the currency stored
-// isn't recognized.
-export const money = (n: number): string => {
-  const currency = getCachedSettings()?.currency ?? 'EUR';
-  const symbol = CURRENCY_SYMBOLS[currency] ?? '€';
-  return `${symbol}${(Math.round((Number(n) || 0) * 100) / 100).toFixed(2)}`;
-};
+// Algeria-only build: single currency, always Algerian Dinar. Written as a
+// suffix ("1 250 Da"), which is how DA amounts are normally read/written
+// here — unlike a symbol like €/$ that goes before the number.
+export const money = (n: number): string =>
+  `${(Math.round((Number(n) || 0) * 100) / 100).toFixed(2)} Da`;
 
 export const orderNumber = (id: number): string => `#${id + 1000}`;
 
+const TIME_AGO = {
+  fr: { just_now: "à l'instant", min_ago: (m: number) => `il y a ${m} min`, h_ago: (h: number) => `il y a ${h} h` },
+  ar: { just_now: 'الآن', min_ago: (m: number) => `منذ ${m} د`, h_ago: (h: number) => `منذ ${h} س` },
+} as const;
+
 export function timeAgo(iso: string): string {
+  const lang = getCurrentLang();
+  const strings = TIME_AGO[lang];
   const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
-  if (s < 60) return 'just now';
+  if (s < 60) return strings.just_now;
   const m = Math.floor(s / 60);
-  if (m < 60) return `${m} min ago`;
+  if (m < 60) return strings.min_ago(m);
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h} h ago`;
-  return new Date(iso).toLocaleDateString();
+  if (h < 24) return strings.h_ago(h);
+  return new Date(iso).toLocaleDateString(lang === 'ar' ? 'ar-DZ' : 'fr-FR');
 }
 
 export const clock = (iso: string): string =>
-  new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  new Date(iso).toLocaleTimeString(getCurrentLang() === 'ar' ? 'ar-DZ' : 'fr-FR', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });

@@ -1,6 +1,7 @@
 import { Plus } from 'lucide-react';
 import type { Product } from '../../lib/types';
 import { money } from '../../lib/format';
+import { useLang } from '../../lib/i18n';
 
 interface Props {
   product: Product;
@@ -9,6 +10,7 @@ interface Props {
 }
 
 export default function ProductCard({ product, onOpen, onQuickAdd }: Props) {
+  const { t } = useLang();
   const soldOut = !product.is_available || product.stock <= 0;
   return (
     <div
@@ -27,8 +29,8 @@ export default function ProductCard({ product, onOpen, onQuickAdd }: Props) {
           <div className="flex h-full w-full items-center justify-center text-4xl">🍽️</div>
         )}
         {soldOut && (
-          <span className="absolute left-2 top-2 rounded-full bg-zinc-900/80 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
-            Sold out
+          <span className="absolute start-2 top-2 rounded-full bg-zinc-900/80 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+            {t('shop.sold_out')}
           </span>
         )}
       </div>
@@ -42,7 +44,7 @@ export default function ProductCard({ product, onOpen, onQuickAdd }: Props) {
               if (!soldOut) onQuickAdd(product);
             }}
             disabled={soldOut}
-            aria-label={`Add ${product.name} to cart`}
+            aria-label={t('shop.add_to_cart', { name: product.name })}
             className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-500 text-white shadow-sm transition hover:bg-brand-600 active:scale-90 disabled:bg-zinc-300"
           >
             <Plus size={16} strokeWidth={3} />

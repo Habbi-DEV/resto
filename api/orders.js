@@ -2,16 +2,16 @@ import supabase from './db-client.js';
 
 const ORDER_TYPES = ['dine_in', 'takeaway', 'delivery'];
 const ORDER_STATUSES = ['pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery', 'completed', 'cancelled'];
-const FALLBACK_TAX_RATE = 0.10; // used only if the settings row can't be read
 
-// tax_rate now lives in `settings` (single source of truth, editable from
-// /admin/settings) instead of being duplicated here as a hard-coded
-// constant. It's fetched per-order rather than cached, since it's a single
-// cheap row read and settings can change between orders.
-async function getTaxRate() {
-  const { data, error } = await supabase.from('settings').select('tax_rate').eq('id', 1).single();
-  if (error || data == null) return FALLBACK_TAX_RATE;
-  return Number(data.tax_rate);
+// No VAT/tax in this build (Algeria: not applicable). delivery_fee lives in
+// `settings` (single source of truth, editable from /admin/settings) and is
+// snapshotted onto the order at creation time, same reasoning tax_rate used
+// to get snapshotted for: settings can change between orders, and the order
+// row needs to keep the fee that was actually charged.
+async function getDeliveryFee() {
+  const { data, error } = await supabase.from('settings').select('delivery_fee').eq('id', 1).single();
+  if (error || data == null) return 0;
+  return Number(data.delivery_fee) || 0;
 }
 
 async function requireStaff(req, res) {
@@ -98,7 +98,7 @@ export default async function handler(req, res) {
       const {
         order_type, table_number,
         customer_name, customer_phone, delivery_address,
-        notes, payment_method, items,
+        notes, items,
       } = body;
 
       if (!ORDER_TYPES.includes(order_type)) {
@@ -184,9 +184,8 @@ export default async function handler(req, res) {
         rows.push({ product_id: p.id, product_name: p.name, unit_price, quantity, sauces: chosenSauces, supplements: chosenSupplements });
       }
       subtotal = Math.round(subtotal * 100) / 100;
-      const tax_rate = await getTaxRate();
-      const tax_amount = Math.round(subtotal * tax_rate * 100) / 100;
-      const total = Math.round((subtotal + tax_amount) * 100) / 100;
+      const delivery_fee = order_type === 'delivery' ? await getDeliveryFee() : 0;
+      const total = Math.round((subtotal + delivery_fee) * 100) / 100;
 
       const { data: order, error: oErr } = await supabase
         .from('orders')
@@ -198,14 +197,15 @@ export default async function handler(req, res) {
           customer_phone: order_type === 'delivery' ? String(customer_phone).trim() : null,
           delivery_address: order_type === 'delivery' ? String(delivery_address).trim() : null,
           notes: notes ? String(notes).trim() : null,
-          payment_method: payment_method === 'cash' ? 'cash' : 'card',
-          // tax_rate is snapshotted onto the order row itself (not just used
-          // to compute tax_amount here) because schema.sql's
-          // recalc_order_totals() trigger re-derives subtotal/tax_amount/total
-          // from `orders.tax_rate` every time order_items change. Without
-          // this, that trigger would keep using its column default (0.10)
+          // Algeria: cash only, no other payment method is offered.
+          payment_method: 'cash',
+          // delivery_fee is snapshotted onto the order row itself (not just
+          // used to compute total here) because schema.sql's
+          // recalc_order_totals() trigger re-derives subtotal/total from
+          // `orders.delivery_fee` every time order_items change. Without
+          // this, that trigger would keep using its column default (0)
           // regardless of what's configured in Settings.
-          subtotal, tax_rate, tax_amount, total,
+          subtotal, delivery_fee, total,
         })
         .select()
         .single();

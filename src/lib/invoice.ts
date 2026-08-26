@@ -1,14 +1,46 @@
 import type { Order } from './types';
 import { money, orderNumber } from './format';
+import { getCurrentLang } from './i18n';
 
 const escapeHtml = (s: string): string =>
   s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
 
-const ORDER_TYPE_LABEL: Record<Order['order_type'], string> = {
-  dine_in: 'Dine-In',
-  takeaway: 'Takeaway',
-  delivery: 'Delivery',
-};
+const INVOICE_STRINGS = {
+  fr: {
+    receipt: 'Facture / Reçu',
+    order: 'Commande',
+    date: 'Date',
+    type: 'Type',
+    table: 'Table',
+    pickup: 'À récupérer au comptoir',
+    subtotal: 'Sous-total',
+    delivery: 'Livraison',
+    total: 'Total',
+    payment: 'Paiement',
+    cash: 'Espèces',
+    notes: 'Notes',
+    thanks: 'Merci pour votre commande ! 🧡',
+    popup_blocked: "Merci d'autoriser les pop-ups pour imprimer la facture.",
+    types: { dine_in: 'Sur place', takeaway: 'À emporter', delivery: 'Livraison' } as Record<Order['order_type'], string>,
+  },
+  ar: {
+    receipt: 'فاتورة / إيصال',
+    order: 'الطلب',
+    date: 'التاريخ',
+    type: 'النوع',
+    table: 'طاولة',
+    pickup: 'استلام من الكاونتر',
+    subtotal: 'المجموع الفرعي',
+    delivery: 'التوصيل',
+    total: 'المجموع',
+    payment: 'الدفع',
+    cash: 'نقداً',
+    notes: 'ملاحظات',
+    thanks: 'شكراً لطلبكم! 🧡',
+    popup_blocked: 'الرجاء السماح بالنوافذ المنبثقة لطباعة الفاتورة.',
+    types: { dine_in: 'في المطعم', takeaway: 'استلام', delivery: 'توصيل' } as Record<Order['order_type'], string>,
+  },
+} as const;
 
 /**
  * Opens a print-ready receipt/invoice for the given order in a new window
@@ -16,25 +48,30 @@ const ORDER_TYPE_LABEL: Record<Order['order_type'], string> = {
  * dependency) so it prints cleanly regardless of what's on screen.
  */
 export function printInvoice(order: Order): void {
+  const lang = getCurrentLang();
+  const L = INVOICE_STRINGS[lang];
+  const dir = lang === 'ar' ? 'rtl' : 'ltr';
+
   const win = window.open('', '_blank', 'width=420,height=680');
   if (!win) {
-    alert('Please allow pop-ups to print the invoice.');
+    alert(L.popup_blocked);
     return;
   }
 
   const created = new Date(order.created_at);
-  const dateStr = created.toLocaleDateString();
-  const timeStr = created.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const locale = lang === 'ar' ? 'ar-DZ' : 'fr-FR';
+  const dateStr = created.toLocaleDateString(locale);
+  const timeStr = created.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
 
   const contextLine =
     order.order_type === 'dine_in'
-      ? `Table ${order.table_number ?? '—'}`
+      ? `${L.table} ${order.table_number ?? '—'}`
       : order.order_type === 'delivery'
       ? [order.customer_name, order.customer_phone, order.delivery_address]
           .filter((v): v is string => Boolean(v))
           .map(escapeHtml)
           .join('<br/>')
-      : 'Pickup at counter';
+      : L.pickup;
 
   const itemsHtml = (order.items ?? [])
     .map((it) => {
@@ -52,10 +89,10 @@ export function printInvoice(order: Order): void {
     .join('');
 
   const html = `<!doctype html>
-<html>
+<html lang="${lang}" dir="${dir}">
 <head>
 <meta charset="utf-8" />
-<title>Invoice ${orderNumber(order.id)}</title>
+<title>${L.receipt} ${orderNumber(order.id)}</title>
 <style>
   * { box-sizing: border-box; }
   body {
@@ -64,6 +101,7 @@ export function printInvoice(order: Order): void {
     max-width: 380px;
     margin: 0 auto;
     padding: 24px 20px;
+    direction: ${dir};
   }
   .brand { text-align: center; margin-bottom: 4px; }
   .brand .logo { font-size: 28px; }
@@ -95,15 +133,15 @@ export function printInvoice(order: Order): void {
   <div class="brand">
     <div class="logo">🍽️</div>
     <h1>RESTOLINK</h1>
-    <p>Invoice / Receipt</p>
+    <p>${L.receipt}</p>
   </div>
 
   <hr class="divider" />
 
   <div class="meta">
-    <div class="row"><span class="label">Order</span><span>${orderNumber(order.id)}</span></div>
-    <div class="row"><span class="label">Date</span><span>${dateStr} · ${timeStr}</span></div>
-    <div class="row"><span class="label">Type</span><span>${ORDER_TYPE_LABEL[order.order_type]}</span></div>
+    <div class="row"><span class="label">${L.order}</span><span>${orderNumber(order.id)}</span></div>
+    <div class="row"><span class="label">${L.date}</span><span>${dateStr} · ${timeStr}</span></div>
+    <div class="row"><span class="label">${L.type}</span><span>${L.types[order.order_type]}</span></div>
   </div>
   <div class="context">${contextLine}</div>
 
@@ -114,15 +152,15 @@ export function printInvoice(order: Order): void {
   </table>
 
   <div class="totals">
-    <div class="row"><span>Subtotal</span><span>${money(order.subtotal)}</span></div>
-    <div class="row"><span>VAT</span><span>${money(order.tax_amount)}</span></div>
-    <div class="grand"><span>Total</span><span>${money(order.total)}</span></div>
+    <div class="row"><span>${L.subtotal}</span><span>${money(order.subtotal)}</span></div>
+    ${order.delivery_fee > 0 ? `<div class="row"><span>${L.delivery}</span><span>${money(order.delivery_fee)}</span></div>` : ''}
+    <div class="grand"><span>${L.total}</span><span>${money(order.total)}</span></div>
   </div>
 
-  <div class="payment">Payment: ${escapeHtml(order.payment_method)}</div>
-  ${order.notes ? `<div class="payment">Notes: ${escapeHtml(order.notes)}</div>` : ''}
+  <div class="payment">${L.payment}: ${L.cash}</div>
+  ${order.notes ? `<div class="payment">${L.notes}: ${escapeHtml(order.notes)}</div>` : ''}
 
-  <div class="footer">Thank you for your order! 🧡</div>
+  <div class="footer">${L.thanks}</div>
 </body>
 </html>`;
 

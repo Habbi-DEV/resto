@@ -5,21 +5,22 @@ import { api } from '../../lib/api';
 import { money, orderNumber, timeAgo } from '../../lib/format';
 import { printInvoice } from '../../lib/invoice';
 import { useCartStore, selectSubtotal } from '../../stores/cartStore';
+import { useSettings } from '../../lib/settings';
+import { useLang } from '../../lib/i18n';
 import useLiveOrders from '../../hooks/useLiveOrders';
 import StatusBadge from '../../components/StatusBadge';
 import { OrderTypeTag, orderContext } from '../../components/OrderTypeTag';
 import Spinner from '../../components/ui/Spinner';
 import type { OrderType } from '../../lib/types';
 
-const TAX_RATE = 0.10;
-
-const TYPES: { value: OrderType; label: string; emoji: string }[] = [
-  { value: 'dine_in', label: 'Dine-In', emoji: '🍽️' },
-  { value: 'takeaway', label: 'Takeaway', emoji: '🥡' },
-  { value: 'delivery', label: 'Delivery', emoji: '🛵' },
+const TYPES: { value: OrderType; labelKey: string; emoji: string }[] = [
+  { value: 'dine_in', labelKey: 'orderType.dine_in', emoji: '🍽️' },
+  { value: 'takeaway', labelKey: 'orderType.takeaway', emoji: '🥡' },
+  { value: 'delivery', labelKey: 'orderType.delivery', emoji: '🛵' },
 ];
 
 export default function RegisterPage() {
+  const { t } = useLang();
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [tables, setTables] = useState<RestaurantTable[]>([]);
@@ -30,13 +31,15 @@ export default function RegisterPage() {
   const [flash, setFlash] = useState('');
 
   const { orders, loading: feedLoading, refresh } = useLiveOrders(25, 5000);
+  const settings = useSettings();
 
   const { lines, add, inc, dec, remove, clear } = useCartStore();
   const subtotal = useCartStore(selectSubtotal);
-  const tax = Math.round(subtotal * TAX_RATE * 100) / 100;
-  const total = Math.round((subtotal + tax) * 100) / 100;
 
   const [orderType, setOrderType] = useState<OrderType>('dine_in');
+  // Delivery fee only applies once "Delivery" is picked on the ticket.
+  const deliveryFee = orderType === 'delivery' ? Number(settings?.delivery_fee ?? 0) : 0;
+  const total = Math.round((subtotal + deliveryFee) * 100) / 100;
   const [tableNumber, setTableNumber] = useState<number | null>(null);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -71,12 +74,12 @@ export default function RegisterPage() {
 
   const placeOrder = async () => {
     const e: Record<string, string> = {};
-    if (lines.length === 0) e.items = 'Add at least one item to the ticket.';
-    if (orderType === 'dine_in' && !tableNumber) e.table = 'Select a table for this dine-in order.';
+    if (lines.length === 0) e.items = t('register.error_items');
+    if (orderType === 'dine_in' && !tableNumber) e.table = t('register.error_table');
     if (orderType === 'delivery') {
-      if (!name.trim()) e.name = 'Customer name required.';
-      if (phone.trim().replace(/\D/g, '').length < 6) e.phone = 'Valid phone required.';
-      if (!address.trim()) e.address = 'Address required.';
+      if (!name.trim()) e.name = t('register.error_name');
+      if (phone.trim().replace(/\D/g, '').length < 6) e.phone = t('register.error_phone');
+      if (!address.trim()) e.address = t('register.error_address');
     }
     setErrors(e);
     if (Object.keys(e).length > 0) return;
@@ -92,7 +95,8 @@ export default function RegisterPage() {
           customer_phone: orderType === 'delivery' ? phone : undefined,
           delivery_address: orderType === 'delivery' ? address : undefined,
           notes: notes || undefined,
-          payment_method: 'card',
+          // Algeria: cash only — the API forces this server-side too.
+          payment_method: 'cash',
           items: lines.map((l) => ({
             product_id: l.product.id,
             quantity: l.qty,
@@ -103,13 +107,13 @@ export default function RegisterPage() {
       });
       clear();
       setTableNumber(null); setName(''); setPhone(''); setAddress(''); setNotes('');
-      setFlash(`Order ${orderNumber(order.id)} sent to kitchen ✅`);
+      setFlash(t('register.sent_to_kitchen', { n: orderNumber(order.id) }));
       setTimeout(() => setFlash(''), 3500);
       setTab('live');
       refresh();
       loadAll();
     } catch (err) {
-      setErrors({ items: err instanceof Error ? err.message : 'Failed to place order' });
+      setErrors({ items: err instanceof Error ? err.message : t('register.error_generic') });
     } finally {
       setPlacing(false);
     }
@@ -121,18 +125,18 @@ export default function RegisterPage() {
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <div className="border-b border-zinc-200 bg-white p-4">
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="font-display text-xl font-bold text-zinc-900">Register</h1>
-            <div className="relative ml-auto w-full sm:w-64">
-              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+            <h1 className="font-display text-xl font-bold text-zinc-900">{t('register.title')}</h1>
+            <div className="relative ms-auto w-full sm:w-64">
+              <Search size={15} className="absolute start-3 top-1/2 -translate-y-1/2 text-zinc-400" />
               <input
                 value={search} onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search products…"
-                className="w-full rounded-xl border border-zinc-200 py-2 pl-9 pr-3 text-sm outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
+                placeholder={t('register.search_products')}
+                className="w-full rounded-xl border border-zinc-200 py-2 ps-9 pe-3 text-sm outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
               />
             </div>
           </div>
           <div className="no-scrollbar mt-3 flex gap-2 overflow-x-auto">
-            <button onClick={() => setActiveCat('all')} className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-bold transition ${activeCat === 'all' ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'}`}>All</button>
+            <button onClick={() => setActiveCat('all')} className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-bold transition ${activeCat === 'all' ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'}`}>{t('register.all')}</button>
             {categories.map((c) => (
               <button key={c.id} onClick={() => setActiveCat(c.id)} className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-bold transition ${activeCat === c.id ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'}`}>
                 {c.icon} {c.name}
@@ -143,7 +147,7 @@ export default function RegisterPage() {
 
         <div className="thin-scroll flex-1 overflow-y-auto p-4">
           {loading ? (
-            <Spinner label="Loading products…" />
+            <Spinner label={t('register.loading_products')} />
           ) : (
             <div className="grid grid-cols-2 gap-3 md:grid-cols-3 2xl:grid-cols-4">
               {visible.map((p) => {
@@ -158,7 +162,7 @@ export default function RegisterPage() {
                     <div className="relative h-24 bg-orange-50">
                       {p.image_url && <img src={p.image_url} alt={p.name} loading="lazy" className="h-full w-full object-cover" />}
                       {p.stock > 0 && p.stock <= 8 && (
-                        <span className="absolute right-1.5 top-1.5 rounded-full bg-amber-400 px-1.5 py-0.5 text-[9px] font-bold text-amber-950">{p.stock} left</span>
+                        <span className="absolute end-1.5 top-1.5 rounded-full bg-amber-400 px-1.5 py-0.5 text-[9px] font-bold text-amber-950">{p.stock} {t('register.left')}</span>
                       )}
                     </div>
                     <div className="p-2.5">
@@ -179,12 +183,12 @@ export default function RegisterPage() {
       {/* -------- right panel: ticket / live feed -------- */}
       <aside className="flex w-full shrink-0 flex-col border-t border-zinc-200 bg-white lg:w-[380px] lg:border-l lg:border-t-0">
         <div className="flex border-b border-zinc-100">
-          {(['ticket', 'live'] as const).map((t) => (
+          {(['ticket', 'live'] as const).map((tabKey) => (
             <button
-              key={t} onClick={() => setTab(t)}
-              className={`flex-1 py-3 text-sm font-bold transition ${tab === t ? 'border-b-2 border-brand-500 text-brand-600' : 'text-zinc-400 hover:text-zinc-600'}`}
+              key={tabKey} onClick={() => setTab(tabKey)}
+              className={`flex-1 py-3 text-sm font-bold transition ${tab === tabKey ? 'border-b-2 border-brand-500 text-brand-600' : 'text-zinc-400 hover:text-zinc-600'}`}
             >
-              {t === 'ticket' ? `Current ticket${lines.length ? ` (${lines.length})` : ''}` : 'Live feed'}
+              {tabKey === 'ticket' ? `${t('register.ticket')}${lines.length ? ` (${lines.length})` : ''}` : t('register.live_feed')}
             </button>
           ))}
         </div>
@@ -195,13 +199,13 @@ export default function RegisterPage() {
           <div className="thin-scroll flex flex-1 flex-col overflow-y-auto p-4">
             {/* order type */}
             <div className="grid grid-cols-3 gap-2">
-              {TYPES.map((t) => (
+              {TYPES.map((opt) => (
                 <button
-                  key={t.value} onClick={() => setOrderType(t.value)}
-                  className={`rounded-xl border-2 py-2 text-center transition ${orderType === t.value ? 'border-brand-500 bg-brand-50' : 'border-zinc-100 hover:border-zinc-200'}`}
+                  key={opt.value} onClick={() => setOrderType(opt.value)}
+                  className={`rounded-xl border-2 py-2 text-center transition ${orderType === opt.value ? 'border-brand-500 bg-brand-50' : 'border-zinc-100 hover:border-zinc-200'}`}
                 >
-                  <span className="block text-base">{t.emoji}</span>
-                  <span className={`text-[11px] font-bold ${orderType === t.value ? 'text-brand-700' : 'text-zinc-500'}`}>{t.label}</span>
+                  <span className="block text-base">{opt.emoji}</span>
+                  <span className={`text-[11px] font-bold ${orderType === opt.value ? 'text-brand-700' : 'text-zinc-500'}`}>{t(opt.labelKey)}</span>
                 </button>
               ))}
             </div>
@@ -210,18 +214,18 @@ export default function RegisterPage() {
             {orderType === 'dine_in' && (
               <div className="mt-3">
                 <div className="grid grid-cols-6 gap-1.5">
-                  {tables.map((t) => (
+                  {tables.map((tbl) => (
                     <button
-                      key={t.id} onClick={() => t.status !== 'occupied' && setTableNumber(t.table_number)}
-                      disabled={t.status === 'occupied' && tableNumber !== t.table_number}
-                      title={`Table ${t.table_number} · ${t.status}`}
+                      key={tbl.id} onClick={() => tbl.status !== 'occupied' && setTableNumber(tbl.table_number)}
+                      disabled={tbl.status === 'occupied' && tableNumber !== tbl.table_number}
+                      title={`${tbl.table_number} · ${tbl.status}`}
                       className={`rounded-lg py-1.5 text-xs font-bold transition ${
-                        tableNumber === t.table_number ? 'bg-brand-500 text-white' :
-                        t.status === 'occupied' ? 'bg-zinc-100 text-zinc-300' :
-                        t.status === 'reserved' ? 'bg-indigo-50 text-indigo-400' : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200'
+                        tableNumber === tbl.table_number ? 'bg-brand-500 text-white' :
+                        tbl.status === 'occupied' ? 'bg-zinc-100 text-zinc-300' :
+                        tbl.status === 'reserved' ? 'bg-indigo-50 text-indigo-400' : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200'
                       }`}
                     >
-                      {t.table_number}
+                      {tbl.table_number}
                     </button>
                   ))}
                 </div>
@@ -230,16 +234,16 @@ export default function RegisterPage() {
             )}
             {orderType === 'delivery' && (
               <div className="mt-3 space-y-2">
-                <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Customer name *" className={`w-full rounded-lg border px-3 py-2 text-xs outline-none ${errors.name ? 'border-red-300' : 'border-zinc-200'}`} />
-                <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Phone *" className={`w-full rounded-lg border px-3 py-2 text-xs outline-none ${errors.phone ? 'border-red-300' : 'border-zinc-200'}`} />
-                <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Delivery address *" className={`w-full rounded-lg border px-3 py-2 text-xs outline-none ${errors.address ? 'border-red-300' : 'border-zinc-200'}`} />
+                <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t('register.customer_name')} className={`w-full rounded-lg border px-3 py-2 text-xs outline-none ${errors.name ? 'border-red-300' : 'border-zinc-200'}`} />
+                <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder={t('register.phone')} className={`w-full rounded-lg border px-3 py-2 text-xs outline-none ${errors.phone ? 'border-red-300' : 'border-zinc-200'}`} />
+                <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder={t('register.delivery_address')} className={`w-full rounded-lg border px-3 py-2 text-xs outline-none ${errors.address ? 'border-red-300' : 'border-zinc-200'}`} />
               </div>
             )}
 
             {/* items */}
             <div className="mt-4 flex-1">
               {lines.length === 0 ? (
-                <p className="py-8 text-center text-xs text-zinc-400">Tap products to build the ticket.</p>
+                <p className="py-8 text-center text-xs text-zinc-400">{t('register.tap_to_build')}</p>
               ) : (
                 <ul className="space-y-2">
                   {lines.map((l) => (
@@ -259,19 +263,21 @@ export default function RegisterPage() {
               {errors.items && <p className="mt-2 text-[11px] font-medium text-red-500">{errors.items}</p>}
             </div>
 
-            <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Ticket notes…" className="mt-3 w-full rounded-lg border border-zinc-200 px-3 py-2 text-xs outline-none" />
+            <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={t('register.ticket_notes')} className="mt-3 w-full rounded-lg border border-zinc-200 px-3 py-2 text-xs outline-none" />
 
             {/* totals + CTA */}
             <div className="mt-3 space-y-1 border-t border-dashed border-zinc-200 pt-3 text-xs">
-              <div className="flex justify-between text-zinc-500"><span>Subtotal</span><span>{money(subtotal)}</span></div>
-              <div className="flex justify-between text-zinc-500"><span>VAT 10%</span><span>{money(tax)}</span></div>
-              <div className="flex justify-between font-display text-base font-bold text-zinc-900"><span>Total</span><span className="text-burnt">{money(total)}</span></div>
+              <div className="flex justify-between text-zinc-500"><span>{t('common.subtotal')}</span><span>{money(subtotal)}</span></div>
+              {deliveryFee > 0 && (
+                <div className="flex justify-between text-zinc-500"><span>{t('common.delivery_fee')}</span><span>{money(deliveryFee)}</span></div>
+              )}
+              <div className="flex justify-between font-display text-base font-bold text-zinc-900"><span>{t('common.total')}</span><span className="text-burnt">{money(total)}</span></div>
             </div>
             <button
               onClick={placeOrder} disabled={placing}
               className="mt-3 w-full rounded-xl bg-brand-500 py-3 font-display text-sm font-bold text-white shadow-lg shadow-orange-500/30 transition hover:bg-brand-600 active:scale-[0.98] disabled:opacity-60"
             >
-              {placing ? 'Sending…' : 'Place order'}
+              {placing ? t('register.sending') : t('register.place_order')}
             </button>
           </div>
         ) : (
@@ -279,7 +285,7 @@ export default function RegisterPage() {
             {feedLoading ? (
               <Spinner />
             ) : orders.length === 0 ? (
-              <p className="py-10 text-center text-xs text-zinc-400">Waiting for the first order…</p>
+              <p className="py-10 text-center text-xs text-zinc-400">{t('register.waiting_first_order')}</p>
             ) : (
               <ul className="space-y-2">
                 {orders.map((o) => (
@@ -287,7 +293,7 @@ export default function RegisterPage() {
                     <div className="flex items-center gap-2">
                       <span className="font-display text-sm font-bold">{orderNumber(o.id)}</span>
                       <OrderTypeTag type={o.order_type} />
-                      <span className="ml-auto text-[10px] text-zinc-400">{timeAgo(o.created_at)}</span>
+                      <span className="ms-auto text-[10px] text-zinc-400">{timeAgo(o.created_at)}</span>
                     </div>
                     <div className="mt-1.5 flex items-center justify-between">
                       <span className="text-[11px] text-zinc-500">{orderContext(o)}</span>
@@ -295,8 +301,8 @@ export default function RegisterPage() {
                         <span className="text-xs font-bold">{money(o.total)}</span>
                         <button
                           onClick={() => printInvoice(o)}
-                          title="Print invoice"
-                          aria-label="Print invoice"
+                          title={t('register.print_invoice')}
+                          aria-label={t('register.print_invoice')}
                           className="flex h-6 w-6 items-center justify-center rounded-lg text-zinc-400 hover:bg-zinc-50 hover:text-brand-600"
                         >
                           <Printer size={13} />
@@ -309,7 +315,7 @@ export default function RegisterPage() {
               </ul>
             )}
             <button onClick={refresh} className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl border border-zinc-200 py-2 text-xs font-bold text-zinc-500 hover:bg-zinc-50">
-              <Check size={13} /> Refresh feed
+              <Check size={13} /> {t('register.refresh_feed')}
             </button>
           </div>
         )}

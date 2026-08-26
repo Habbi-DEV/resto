@@ -4,14 +4,14 @@ import { ArrowLeft, Bike, ChevronRight, Minus, Plus, ShoppingBag, Trash2, Utensi
 import { useCartStore, selectSubtotal } from '../../stores/cartStore';
 import { api } from '../../lib/api';
 import { money } from '../../lib/format';
+import { useSettings } from '../../lib/settings';
+import { useLang } from '../../lib/i18n';
 import type { Order, OrderType, RestaurantTable } from '../../lib/types';
 
-const TAX_RATE = 0.10;
-
-const TYPE_OPTIONS: { value: OrderType; label: string; hint: string; Icon: typeof Bike }[] = [
-  { value: 'dine_in', label: 'Dine-In', hint: 'Served at your table', Icon: UtensilsCrossed },
-  { value: 'takeaway', label: 'Takeaway', hint: 'Pick up at the counter', Icon: ShoppingBag },
-  { value: 'delivery', label: 'Delivery', hint: 'We bring it to you', Icon: Bike },
+const TYPE_OPTIONS: { value: OrderType; labelKey: string; hintKey: string; Icon: typeof Bike }[] = [
+  { value: 'dine_in', labelKey: 'orderType.dine_in', hintKey: 'orderType.dine_in.hint', Icon: UtensilsCrossed },
+  { value: 'takeaway', labelKey: 'orderType.takeaway', hintKey: 'orderType.takeaway.hint', Icon: ShoppingBag },
+  { value: 'delivery', labelKey: 'orderType.delivery', hintKey: 'orderType.delivery.hint', Icon: Bike },
 ];
 
 interface Props {
@@ -21,10 +21,10 @@ interface Props {
 }
 
 export default function CartSheet({ open, onClose, onPlaced }: Props) {
+  const { t } = useLang();
   const { lines, inc, dec, remove, clear } = useCartStore();
   const subtotal = useCartStore(selectSubtotal);
-  const tax = Math.round(subtotal * TAX_RATE * 100) / 100;
-  const total = Math.round((subtotal + tax) * 100) / 100;
+  const settings = useSettings();
 
   const [step, setStep] = useState<'cart' | 'checkout'>('cart');
   const [tables, setTables] = useState<RestaurantTable[]>([]);
@@ -34,8 +34,12 @@ export default function CartSheet({ open, onClose, onPlaced }: Props) {
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [notes, setNotes] = useState('');
-  const [payment, setPayment] = useState<'card' | 'cash'>('card');
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Delivery fee only applies once the customer has picked "Delivery" —
+  // dine-in/takeaway totals are unaffected by settings.delivery_fee.
+  const deliveryFee = orderType === 'delivery' ? Number(settings?.delivery_fee ?? 0) : 0;
+  const total = Math.round((subtotal + deliveryFee) * 100) / 100;
   const [placing, setPlacing] = useState(false);
   const [serverError, setServerError] = useState('');
 
@@ -63,11 +67,11 @@ export default function CartSheet({ open, onClose, onPlaced }: Props) {
 
   const validate = (): boolean => {
     const e: Record<string, string> = {};
-    if (orderType === 'dine_in' && !tableNumber) e.table = 'Please choose your table number.';
+    if (orderType === 'dine_in' && !tableNumber) e.table = t('cart.error_table');
     if (orderType === 'delivery') {
-      if (!name.trim()) e.name = 'Your name is required for delivery.';
-      if (phone.trim().replace(/\D/g, '').length < 6) e.phone = 'A valid phone number is required.';
-      if (!address.trim()) e.address = 'The delivery address is required.';
+      if (!name.trim()) e.name = t('cart.error_name');
+      if (phone.trim().replace(/\D/g, '').length < 6) e.phone = t('cart.error_phone');
+      if (!address.trim()) e.address = t('cart.error_address');
     }
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -75,6 +79,13 @@ export default function CartSheet({ open, onClose, onPlaced }: Props) {
 
   const placeOrder = async () => {
     if (!validate()) return;
+    // Asked here (not on page load) so it's tied to a real click and to a
+    // moment that actually explains why: they're placing an order we could
+    // notify them about. Fire-and-forget — doesn't block submission, and a
+    // "default" (undecided) check means we never re-prompt after a Block.
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission().catch(() => {});
+    }
     setPlacing(true);
     setServerError('');
     try {
@@ -87,7 +98,8 @@ export default function CartSheet({ open, onClose, onPlaced }: Props) {
           customer_phone: orderType === 'delivery' ? phone : undefined,
           delivery_address: orderType === 'delivery' ? address : undefined,
           notes: notes || undefined,
-          payment_method: payment,
+          // Algeria: cash only — the API forces this server-side too.
+          payment_method: 'cash',
           items: lines.map((l) => ({
             product_id: l.product.id,
             quantity: l.qty,
@@ -100,7 +112,7 @@ export default function CartSheet({ open, onClose, onPlaced }: Props) {
       onClose();
       onPlaced(order);
     } catch (err) {
-      setServerError(err instanceof Error ? err.message : 'Could not place the order. Please try again.');
+      setServerError(err instanceof Error ? err.message : t('cart.error_generic'));
     } finally {
       setPlacing(false);
     }
@@ -123,19 +135,19 @@ export default function CartSheet({ open, onClose, onPlaced }: Props) {
             {/* header */}
             <div className="flex items-center gap-3 border-b border-zinc-100 px-5 py-4">
               {step === 'checkout' && (
-                <button onClick={() => setStep('cart')} className="rounded-full p-1.5 text-zinc-500 hover:bg-zinc-100" aria-label="Back">
-                  <ArrowLeft size={18} />
+                <button onClick={() => setStep('cart')} className="rounded-full p-1.5 text-zinc-500 hover:bg-zinc-100" aria-label={t('common.back')}>
+                  <ArrowLeft size={18} className="rtl:rotate-180" />
                 </button>
               )}
               <h2 className="font-display text-lg font-bold text-zinc-900">
-                {step === 'cart' ? 'Your cart' : 'Checkout'}
+                {step === 'cart' ? t('cart.title') : t('cart.checkout')}
               </h2>
-              <span className="ml-auto text-sm font-semibold text-zinc-400">{lines.length} item{lines.length === 1 ? '' : 's'}</span>
+              <span className="ms-auto text-sm font-semibold text-zinc-400">{lines.length} {lines.length === 1 ? t('cart.items') : t('cart.items_plural')}</span>
             </div>
 
             <div className="flex-1 overflow-y-auto thin-scroll px-5 py-4">
               {lines.length === 0 ? (
-                <p className="py-10 text-center text-sm text-zinc-400">Your cart is empty. Add something tasty! 🍔</p>
+                <p className="py-10 text-center text-sm text-zinc-400">{t('cart.empty')}</p>
               ) : step === 'cart' ? (
                 <ul className="space-y-3">
                   {lines.map((l) => {
@@ -154,10 +166,10 @@ export default function CartSheet({ open, onClose, onPlaced }: Props) {
                           <p className="text-sm font-bold text-burnt">{money(unitPrice * l.qty)}</p>
                         </div>
                         <div className="flex items-center gap-2">
-                          <button onClick={() => dec(l.key)} className="flex h-7 w-7 items-center justify-center rounded-full bg-white shadow-sm" aria-label="Decrease"><Minus size={13} /></button>
+                          <button onClick={() => dec(l.key)} className="flex h-7 w-7 items-center justify-center rounded-full bg-white shadow-sm" aria-label={t('cart.decrease')}><Minus size={13} /></button>
                           <span className="w-5 text-center text-sm font-bold">{l.qty}</span>
-                          <button onClick={() => inc(l.key)} className="flex h-7 w-7 items-center justify-center rounded-full bg-white shadow-sm" aria-label="Increase"><Plus size={13} /></button>
-                          <button onClick={() => remove(l.key)} className="ml-1 text-zinc-300 hover:text-red-500" aria-label="Remove"><Trash2 size={16} /></button>
+                          <button onClick={() => inc(l.key)} className="flex h-7 w-7 items-center justify-center rounded-full bg-white shadow-sm" aria-label={t('cart.increase')}><Plus size={13} /></button>
+                          <button onClick={() => remove(l.key)} className="ms-1 text-zinc-300 hover:text-red-500" aria-label={t('cart.remove')}><Trash2 size={16} /></button>
                         </div>
                       </li>
                     );
@@ -167,21 +179,21 @@ export default function CartSheet({ open, onClose, onPlaced }: Props) {
                 <div className="space-y-5">
                   {/* order type */}
                   <div>
-                    <p className="mb-2 text-xs font-bold uppercase tracking-wide text-zinc-400">How would you like your order?</p>
+                    <p className="mb-2 text-xs font-bold uppercase tracking-wide text-zinc-400">{t('cart.how_order')}</p>
                     <div className="grid grid-cols-3 gap-2">
-                      {TYPE_OPTIONS.map((t) => (
+                      {TYPE_OPTIONS.map((opt) => (
                         <button
-                          key={t.value}
-                          onClick={() => setOrderType(t.value)}
+                          key={opt.value}
+                          onClick={() => setOrderType(opt.value)}
                           className={`flex flex-col items-center gap-1 rounded-2xl border-2 px-2 py-3 text-center transition ${
-                            orderType === t.value
+                            orderType === opt.value
                               ? 'border-brand-500 bg-brand-50 text-brand-700'
                               : 'border-zinc-100 bg-white text-zinc-500 hover:border-zinc-200'
                           }`}
                         >
-                          <t.Icon size={20} />
-                          <span className="text-xs font-bold">{t.label}</span>
-                          <span className="text-[10px] leading-tight opacity-70">{t.hint}</span>
+                          <opt.Icon size={20} />
+                          <span className="text-xs font-bold">{t(opt.labelKey)}</span>
+                          <span className="text-[10px] leading-tight opacity-70">{t(opt.hintKey)}</span>
                         </button>
                       ))}
                     </div>
@@ -190,19 +202,19 @@ export default function CartSheet({ open, onClose, onPlaced }: Props) {
                   {/* dine-in: table picker */}
                   {orderType === 'dine_in' && (
                     <div>
-                      <p className="mb-2 text-xs font-bold uppercase tracking-wide text-zinc-400">Your table number</p>
+                      <p className="mb-2 text-xs font-bold uppercase tracking-wide text-zinc-400">{t('cart.table_number')}</p>
                       <div className="grid grid-cols-6 gap-2">
-                        {availableTables.map((t) => (
+                        {availableTables.map((tbl) => (
                           <button
-                            key={t.id}
-                            onClick={() => setTableNumber(t.table_number)}
+                            key={tbl.id}
+                            onClick={() => setTableNumber(tbl.table_number)}
                             className={`rounded-xl py-2.5 text-sm font-bold transition ${
-                              tableNumber === t.table_number
+                              tableNumber === tbl.table_number
                                 ? 'bg-brand-500 text-white shadow-md shadow-orange-500/30'
                                 : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200'
                             }`}
                           >
-                            {t.table_number}
+                            {tbl.table_number}
                           </button>
                         ))}
                       </div>
@@ -214,41 +226,42 @@ export default function CartSheet({ open, onClose, onPlaced }: Props) {
                   {orderType === 'delivery' && (
                     <div className="space-y-3">
                       <div>
-                        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Full name *" className={`w-full rounded-xl border px-3.5 py-3 text-sm outline-none focus:ring-2 focus:ring-brand-200 ${errors.name ? 'border-red-300' : 'border-zinc-200'}`} />
+                        <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t('cart.full_name')} className={`w-full rounded-xl border px-3.5 py-3 text-sm outline-none focus:ring-2 focus:ring-brand-200 ${errors.name ? 'border-red-300' : 'border-zinc-200'}`} />
                         {errors.name && <p className="mt-1 text-xs font-medium text-red-500">{errors.name}</p>}
                       </div>
                       <div>
-                        <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Phone number *" type="tel" className={`w-full rounded-xl border px-3.5 py-3 text-sm outline-none focus:ring-2 focus:ring-brand-200 ${errors.phone ? 'border-red-300' : 'border-zinc-200'}`} />
+                        <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder={t('cart.phone')} type="tel" className={`w-full rounded-xl border px-3.5 py-3 text-sm outline-none focus:ring-2 focus:ring-brand-200 ${errors.phone ? 'border-red-300' : 'border-zinc-200'}`} />
                         {errors.phone && <p className="mt-1 text-xs font-medium text-red-500">{errors.phone}</p>}
                       </div>
                       <div>
-                        <textarea value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Delivery address *" rows={2} className={`w-full resize-none rounded-xl border px-3.5 py-3 text-sm outline-none focus:ring-2 focus:ring-brand-200 ${errors.address ? 'border-red-300' : 'border-zinc-200'}`} />
+                        <textarea value={address} onChange={(e) => setAddress(e.target.value)} placeholder={t('cart.delivery_address')} rows={2} className={`w-full resize-none rounded-xl border px-3.5 py-3 text-sm outline-none focus:ring-2 focus:ring-brand-200 ${errors.address ? 'border-red-300' : 'border-zinc-200'}`} />
                         {errors.address && <p className="mt-1 text-xs font-medium text-red-500">{errors.address}</p>}
                       </div>
                     </div>
                   )}
 
-                  {/* notes + payment */}
+                  {/* notes */}
                   <div>
-                    <p className="mb-2 text-xs font-bold uppercase tracking-wide text-zinc-400">Notes for the kitchen (optional)</p>
-                    <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="e.g. no onions, extra sauce…" className="w-full resize-none rounded-xl border border-zinc-200 px-3.5 py-3 text-sm outline-none focus:ring-2 focus:ring-brand-200" />
+                    <p className="mb-2 text-xs font-bold uppercase tracking-wide text-zinc-400">{t('cart.kitchen_notes')}</p>
+                    <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder={t('cart.kitchen_notes.placeholder')} className="w-full resize-none rounded-xl border border-zinc-200 px-3.5 py-3 text-sm outline-none focus:ring-2 focus:ring-brand-200" />
                   </div>
+
+                  {/* payment — Algeria: cash only, shown as a fixed, non-interactive
+                      indicator rather than a choice since there's nothing to pick. */}
                   <div>
-                    <p className="mb-2 text-xs font-bold uppercase tracking-wide text-zinc-400">Payment</p>
-                    <div className="grid grid-cols-2 gap-2">
-                      {(['card', 'cash'] as const).map((m) => (
-                        <button key={m} onClick={() => setPayment(m)} className={`rounded-xl border-2 py-2.5 text-sm font-bold capitalize transition ${payment === m ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-zinc-100 text-zinc-500'}`}>
-                          {m === 'card' ? '💳 Card' : '💶 Cash'}
-                        </button>
-                      ))}
+                    <p className="mb-2 text-xs font-bold uppercase tracking-wide text-zinc-400">{t('cart.payment')}</p>
+                    <div className="flex items-center gap-2 rounded-xl border-2 border-brand-500 bg-brand-50 px-3.5 py-2.5 text-sm font-bold text-brand-700">
+                      💶 {t('payment.cash')}
                     </div>
                   </div>
 
                   {/* totals */}
                   <div className="space-y-1.5 rounded-2xl bg-zinc-50 p-4 text-sm">
-                    <div className="flex justify-between text-zinc-500"><span>Subtotal</span><span>{money(subtotal)}</span></div>
-                    <div className="flex justify-between text-zinc-500"><span>VAT (10%)</span><span>{money(tax)}</span></div>
-                    <div className="flex justify-between border-t border-zinc-200 pt-2 font-display text-base font-bold text-zinc-900"><span>Total</span><span className="text-burnt">{money(total)}</span></div>
+                    <div className="flex justify-between text-zinc-500"><span>{t('common.subtotal')}</span><span>{money(subtotal)}</span></div>
+                    {deliveryFee > 0 && (
+                      <div className="flex justify-between text-zinc-500"><span>{t('common.delivery_fee')}</span><span>{money(deliveryFee)}</span></div>
+                    )}
+                    <div className="flex justify-between border-t border-zinc-200 pt-2 font-display text-base font-bold text-zinc-900"><span>{t('common.total')}</span><span className="text-burnt">{money(total)}</span></div>
                   </div>
 
                   {serverError && <p className="rounded-xl bg-red-50 px-3 py-2 text-xs font-medium text-red-600">{serverError}</p>}
@@ -264,7 +277,7 @@ export default function CartSheet({ open, onClose, onPlaced }: Props) {
                     onClick={() => setStep('checkout')}
                     className="flex w-full items-center justify-center gap-1 rounded-full bg-brand-500 py-3.5 font-display text-[15px] font-bold text-white shadow-lg shadow-orange-500/30 transition hover:bg-brand-600 active:scale-[0.98]"
                   >
-                    Checkout · {money(total)} <ChevronRight size={18} />
+                    {t('cart.checkout_cta')} · {money(total)} <ChevronRight size={18} className="rtl:rotate-180" />
                   </button>
                 ) : (
                   <button
@@ -272,7 +285,7 @@ export default function CartSheet({ open, onClose, onPlaced }: Props) {
                     disabled={placing}
                     className="w-full rounded-full bg-brand-500 py-3.5 font-display text-[15px] font-bold text-white shadow-lg shadow-orange-500/30 transition hover:bg-brand-600 active:scale-[0.98] disabled:opacity-60"
                   >
-                    {placing ? 'Placing order…' : `Place order · ${money(total)}`}
+                    {placing ? t('cart.placing_order') : `${t('cart.place_order')} · ${money(total)}`}
                   </button>
                 )}
               </div>

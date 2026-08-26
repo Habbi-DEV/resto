@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Droplet, Layers, Minus, Plus, X } from 'lucide-react';
 import type { Product, Sauce, Supplement } from '../../lib/types';
 import { money } from '../../lib/format';
+import { useLang } from '../../lib/i18n';
 
 interface Props {
   product: Product | null;
@@ -10,16 +11,16 @@ interface Props {
   onAdd: (p: Product, qty: number, sauces: Sauce[], supplements: Supplement[]) => void;
 }
 
-// Multiple stacked drop-shadows (not a box border) so the orange highlight
+// Multiple stacked drop-shadows (not a box border) so the green highlight
 // traces the swatch's own alpha silhouette instead of a rectangle — two
 // tight passes build a crisp outline, two passes with modest blur build a
 // contained glow that hugs the shape rather than spreading far past it.
-// Matches the brand-500/600 orange used elsewhere (e.g. "Add to cart").
 // Shared by both Sauces and Supplements so the two pickers look identical.
 const SELECTED_FILTER =
-  'drop-shadow(0 0 1.5px #f97316) drop-shadow(0 0 1.5px #f97316) drop-shadow(0 0 3px rgba(249,115,22,0.65)) drop-shadow(0 0 6px rgba(249,115,22,0.35))';
+  'drop-shadow(0 0 1.5px #22c55e) drop-shadow(0 0 1.5px #22c55e) drop-shadow(0 0 3px rgba(34,197,94,0.65)) drop-shadow(0 0 6px rgba(34,197,94,0.35))';
 
 export default function ProductSheet({ product, onClose, onAdd }: Props) {
+  const { t } = useLang();
   const [qty, setQty] = useState(1);
   const [photoIdx, setPhotoIdx] = useState(0);
   const [selectedSauceIds, setSelectedSauceIds] = useState<number[]>([]);
@@ -79,8 +80,8 @@ export default function ProductSheet({ product, onClose, onAdd }: Props) {
               )}
               <button
                 onClick={onClose}
-                className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-zinc-700 shadow"
-                aria-label="Close"
+                className="absolute end-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-zinc-700 shadow"
+                aria-label={t('shop.close')}
               >
                 <X size={18} />
               </button>
@@ -88,24 +89,24 @@ export default function ProductSheet({ product, onClose, onAdd }: Props) {
                 <>
                   <button
                     onClick={() => setPhotoIdx((i) => (i - 1 + photos.length) % photos.length)}
-                    className="absolute left-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-zinc-700 shadow transition hover:bg-white active:scale-90"
-                    aria-label="Previous photo"
+                    className="absolute start-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-zinc-700 shadow transition hover:bg-white active:scale-90 rtl:rotate-180"
+                    aria-label={t('shop.prev_photo')}
                   >
                     <ChevronLeft size={18} />
                   </button>
                   <button
                     onClick={() => setPhotoIdx((i) => (i + 1) % photos.length)}
-                    className="absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-zinc-700 shadow transition hover:bg-white active:scale-90"
-                    aria-label="Next photo"
+                    className="absolute end-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-zinc-700 shadow transition hover:bg-white active:scale-90 rtl:rotate-180"
+                    aria-label={t('shop.next_photo')}
                   >
                     <ChevronRight size={18} />
                   </button>
-                  <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 gap-1.5">
+                  <div className="absolute bottom-3 start-1/2 flex -translate-x-1/2 gap-1.5 rtl:translate-x-1/2">
                     {photos.map((_, i) => (
                       <button
                         key={i}
                         onClick={() => setPhotoIdx(i)}
-                        aria-label={`Photo ${i + 1}`}
+                        aria-label={t('shop.photo_n', { n: i + 1 })}
                         className={`h-1.5 rounded-full transition-all ${i === photoIdx ? 'w-5 bg-white' : 'w-1.5 bg-white/60'}`}
                       />
                     ))}
@@ -122,7 +123,7 @@ export default function ProductSheet({ product, onClose, onAdd }: Props) {
 
               {sauces.length > 0 && (
                 <div className="mt-5">
-                  <p className="mb-3 text-xs font-bold uppercase tracking-wide text-zinc-400">Sauces</p>
+                  <p className="mb-3 text-xs font-bold uppercase tracking-wide text-zinc-400">{t('shop.sauces')}</p>
                   <div className="flex flex-wrap gap-4">
                     {sauces.map((s) => {
                       const active = selectedSauceIds.includes(s.id);
@@ -154,7 +155,7 @@ export default function ProductSheet({ product, onClose, onAdd }: Props) {
                               </span>
                             )}
                           </span>
-                          <span className={`truncate text-[11px] leading-tight ${active ? 'font-bold text-brand-700' : 'font-semibold text-zinc-600'}`}>
+                          <span className={`truncate text-[11px] leading-tight ${active ? 'font-bold text-green-700' : 'font-semibold text-zinc-600'}`}>
                             {s.name}
                           </span>
                           {s.price > 0 && <span className="-mt-1 text-[10px] text-zinc-400">+{money(s.price)}</span>}
@@ -167,7 +168,7 @@ export default function ProductSheet({ product, onClose, onAdd }: Props) {
 
               {supplements.length > 0 && (
                 <div className="mt-5">
-                  <p className="mb-3 text-xs font-bold uppercase tracking-wide text-zinc-400">Supplements</p>
+                  <p className="mb-3 text-xs font-bold uppercase tracking-wide text-zinc-400">{t('shop.supplements')}</p>
                   <div className="flex flex-wrap gap-4">
                     {supplements.map((s) => {
                       const active = selectedSupplementIds.includes(s.id);
@@ -200,7 +201,7 @@ export default function ProductSheet({ product, onClose, onAdd }: Props) {
                               </span>
                             )}
                           </span>
-                          <span className={`truncate text-[11px] leading-tight ${active ? 'font-bold text-brand-700' : 'font-semibold text-zinc-600'}`}>
+                          <span className={`truncate text-[11px] leading-tight ${active ? 'font-bold text-green-700' : 'font-semibold text-zinc-600'}`}>
                             {s.name}
                           </span>
                           {s.price > 0 && <span className="-mt-1 text-[10px] text-zinc-400">+{money(s.price)}</span>}
@@ -216,7 +217,7 @@ export default function ProductSheet({ product, onClose, onAdd }: Props) {
                   <button
                     onClick={() => setQty((q) => Math.max(1, q - 1))}
                     className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-zinc-700 shadow-sm active:scale-90"
-                    aria-label="Decrease quantity"
+                    aria-label={t('shop.decrease_qty')}
                   >
                     <Minus size={16} />
                   </button>
@@ -224,7 +225,7 @@ export default function ProductSheet({ product, onClose, onAdd }: Props) {
                   <button
                     onClick={() => setQty((q) => Math.min(20, q + 1))}
                     className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-zinc-700 shadow-sm active:scale-90"
-                    aria-label="Increase quantity"
+                    aria-label={t('shop.increase_qty')}
                   >
                     <Plus size={16} />
                   </button>
@@ -236,7 +237,7 @@ export default function ProductSheet({ product, onClose, onAdd }: Props) {
                   }}
                   className="flex-1 rounded-full bg-brand-500 py-3.5 font-display text-[15px] font-bold text-white shadow-lg shadow-orange-500/30 transition hover:bg-brand-600 active:scale-[0.98]"
                 >
-                  Add to cart · {money(unitPrice * qty)}
+                  {t('shop.add_to_cart_cta')} · {money(unitPrice * qty)}
                 </button>
               </div>
             </div>

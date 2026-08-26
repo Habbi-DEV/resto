@@ -10,7 +10,7 @@
 --                                     orders, order_items, inventory_logs
 --    3.  Indexes .................... tuned for realtime feeds & POS filters
 --    4.  updated_at ................. generic timestamp trigger
---    5.  Order math ................. auto subtotal / VAT / total recalc
+--    5.  Order math ................. auto subtotal / delivery fee / total recalc
 --    6.  Order validation ........... per-order-type field enforcement
 --                                     (dine_in → table_number,
 --                                      delivery → name + phone + address)
@@ -116,10 +116,11 @@ create table public.orders (
   notes            text,
   subtotal         numeric(10,2) not null default 0,
   discount         numeric(10,2) not null default 0,
-  tax_rate         numeric(5,4)  not null default 0.10,   -- 10 % VAT
-  tax_amount       numeric(10,2) not null default 0,
+  -- Snapshot of settings.delivery_fee at order time (0 unless order_type
+  -- is 'delivery'). No VAT/tax in this build — not applicable in Algeria.
+  delivery_fee     numeric(10,2) not null default 0,
   total            numeric(10,2) not null default 0,
-  payment_method   public.payment_method not null default 'card',
+  payment_method   public.payment_method not null default 'cash',
   created_by       uuid references auth.users (id) on delete set null,
   created_at       timestamptz not null default now(),
   updated_at       timestamptz not null default now()
@@ -183,27 +184,27 @@ create trigger trg_orders_updated     before update on public.orders     for eac
 -- ----------------------------------------------------------------------------
 -- 5. ORDER MATH — recompute order totals whenever items change
 -- ----------------------------------------------------------------------------
--- Any INSERT / UPDATE / DELETE on order_items re-derives subtotal, tax_amount
--- and total on the parent order. The UI only ever *reads* totals.
+-- Any INSERT / UPDATE / DELETE on order_items re-derives subtotal and total
+-- on the parent order. The UI only ever *reads* totals. No VAT/tax in this
+-- build; total = subtotal - discount + delivery_fee (delivery_fee is a flat
+-- per-order snapshot, independent of line items).
 create or replace function public.recalc_order_totals()
 returns trigger language plpgsql security definer set search_path = public as $$
 declare
   target_order bigint := coalesce(new.order_id, old.order_id);
 begin
   update public.orders o
-     set subtotal   = coalesce(s.sum, 0),
-         tax_amount = round(coalesce(s.sum, 0) * o.tax_rate, 2),
-         total      = round(coalesce(s.sum, 0) - o.discount
-                            + coalesce(s.sum, 0) * o.tax_rate, 2)
+     set subtotal = coalesce(s.sum, 0),
+         total    = round(coalesce(s.sum, 0) - o.discount + o.delivery_fee, 2)
     from (select order_id, sum(line_total) as sum
             from public.order_items
            where order_id = target_order
            group by order_id) s
    where o.id = target_order;
 
-  -- order emptied out (all items deleted)
+  -- order emptied out (all items deleted) — total still reflects delivery_fee
   update public.orders
-     set subtotal = 0, tax_amount = 0, total = 0
+     set subtotal = 0, total = delivery_fee
    where id = target_order
      and not exists (select 1 from public.order_items where order_id = target_order);
 

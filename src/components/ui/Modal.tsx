@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { X } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { useLang } from '../../lib/i18n';
 
 interface Props {
   open: boolean;
@@ -11,6 +12,7 @@ interface Props {
 }
 
 export default function Modal({ open, onClose, title, children, wide }: Props) {
+  const { t } = useLang();
   return (
     <AnimatePresence>
       {open && (
@@ -34,7 +36,7 @@ export default function Modal({ open, onClose, title, children, wide }: Props) {
               <button
                 onClick={onClose}
                 className="rounded-full p-1.5 text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700"
-                aria-label="Close"
+                aria-label={t('common.close')}
               >
                 <X size={18} />
               </button>

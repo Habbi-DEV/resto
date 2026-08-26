@@ -7,41 +7,43 @@ import Spinner from '../../components/ui/Spinner';
 import { api } from '../../lib/api';
 import { money, orderNumber, timeAgo } from '../../lib/format';
 import { printInvoice } from '../../lib/invoice';
+import { useLang } from '../../lib/i18n';
 import type { Order, OrderStatus, OrderType } from '../../lib/types';
 
-const STATUS_FILTERS: { value: OrderStatus | 'all'; label: string }[] = [
-  { value: 'all', label: 'All' },
-  { value: 'pending', label: 'Pending' },
-  { value: 'confirmed', label: 'Confirmed' },
-  { value: 'preparing', label: 'Preparing' },
-  { value: 'ready', label: 'Ready' },
-  { value: 'out_for_delivery', label: 'Delivery' },
-  { value: 'completed', label: 'Completed' },
-  { value: 'cancelled', label: 'Cancelled' },
+const STATUS_FILTERS: { value: OrderStatus | 'all'; labelKey: string }[] = [
+  { value: 'all', labelKey: 'orders.all' },
+  { value: 'pending', labelKey: 'status.pending' },
+  { value: 'confirmed', labelKey: 'status.confirmed' },
+  { value: 'preparing', labelKey: 'status.preparing' },
+  { value: 'ready', labelKey: 'status.ready' },
+  { value: 'out_for_delivery', labelKey: 'orderType.delivery' },
+  { value: 'completed', labelKey: 'status.completed' },
+  { value: 'cancelled', labelKey: 'status.cancelled' },
 ];
 
-const TYPE_FILTERS: { value: OrderType | 'all'; label: string }[] = [
-  { value: 'all', label: 'All types' },
-  { value: 'dine_in', label: '🍽️ Dine-In' },
-  { value: 'takeaway', label: '🥡 Takeaway' },
-  { value: 'delivery', label: '🛵 Delivery' },
+const TYPE_FILTERS: { value: OrderType | 'all'; labelKey: string; emoji: string }[] = [
+  { value: 'all', labelKey: 'orders.all_types', emoji: '' },
+  { value: 'dine_in', labelKey: 'orderType.dine_in', emoji: '🍽️' },
+  { value: 'takeaway', labelKey: 'orderType.takeaway', emoji: '🥡' },
+  { value: 'delivery', labelKey: 'orderType.delivery', emoji: '🛵' },
 ];
 
-function nextAction(o: Order): { to: OrderStatus; label: string } | null {
+function nextAction(o: Order): { to: OrderStatus; labelKey: string } | null {
   switch (o.status) {
-    case 'pending': return { to: 'confirmed', label: 'Confirm' };
-    case 'confirmed': return { to: 'preparing', label: 'Start prep' };
-    case 'preparing': return { to: 'ready', label: 'Mark ready' };
+    case 'pending': return { to: 'confirmed', labelKey: 'orders.action.confirm' };
+    case 'confirmed': return { to: 'preparing', labelKey: 'orders.action.start_prep' };
+    case 'preparing': return { to: 'ready', labelKey: 'orders.action.mark_ready' };
     case 'ready':
       return o.order_type === 'delivery'
-        ? { to: 'out_for_delivery', label: 'Dispatch driver' }
-        : { to: 'completed', label: 'Complete' };
-    case 'out_for_delivery': return { to: 'completed', label: 'Delivered' };
+        ? { to: 'out_for_delivery', labelKey: 'orders.action.dispatch' }
+        : { to: 'completed', labelKey: 'orders.action.complete' };
+    case 'out_for_delivery': return { to: 'completed', labelKey: 'orders.action.delivered' };
     default: return null;
   }
 }
 
 export default function OrdersPage() {
+  const { t } = useLang();
   const { orders, loading, refresh } = useLiveOrders(120, 4000);
   const [statusFilter, setStatusFilter] = useState<OrderStatus | 'all'>('all');
   const [typeFilter, setTypeFilter] = useState<OrderType | 'all'>('all');
@@ -72,7 +74,7 @@ export default function OrdersPage() {
       await api(`/api/orders`, { method: 'PUT', body: JSON.stringify({ id, status }) });
       refresh();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Update failed');
+      alert(err instanceof Error ? err.message : t('orders.update_failed'));
     } finally {
       setBusyId(null);
     }
@@ -82,13 +84,13 @@ export default function OrdersPage() {
     <div className="p-4 md:p-6">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="font-display text-2xl font-bold text-zinc-900">Orders</h1>
-          <p className="text-sm text-zinc-500">Live feed — advance each order through the kitchen.</p>
+          <h1 className="font-display text-2xl font-bold text-zinc-900">{t('orders.title')}</h1>
+          <p className="text-sm text-zinc-500">{t('orders.subtitle')}</p>
         </div>
         <div className="flex gap-1.5">
-          {TYPE_FILTERS.map((t) => (
-            <button key={t.value} onClick={() => setTypeFilter(t.value)} className={`rounded-full px-3 py-1.5 text-xs font-bold transition ${typeFilter === t.value ? 'bg-zinc-900 text-white' : 'bg-white text-zinc-500 ring-1 ring-zinc-200'}`}>
-              {t.label}
+          {TYPE_FILTERS.map((tf) => (
+            <button key={tf.value} onClick={() => setTypeFilter(tf.value)} className={`rounded-full px-3 py-1.5 text-xs font-bold transition ${typeFilter === tf.value ? 'bg-zinc-900 text-white' : 'bg-white text-zinc-500 ring-1 ring-zinc-200'}`}>
+              {tf.emoji ? `${tf.emoji} ` : ''}{t(tf.labelKey)}
             </button>
           ))}
         </div>
@@ -100,15 +102,15 @@ export default function OrdersPage() {
             key={s.value} onClick={() => setStatusFilter(s.value)}
             className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-bold transition ${statusFilter === s.value ? 'bg-brand-500 text-white shadow-md shadow-orange-500/30' : 'bg-white text-zinc-500 ring-1 ring-zinc-200 hover:bg-zinc-50'}`}
           >
-            {s.label}{counts[s.value] ? ` · ${counts[s.value]}` : ''}
+            {t(s.labelKey)}{counts[s.value] ? ` · ${counts[s.value]}` : ''}
           </button>
         ))}
       </div>
 
       {loading ? (
-        <Spinner label="Connecting to the order feed…" />
+        <Spinner label={t('orders.connecting')} />
       ) : filtered.length === 0 ? (
-        <div className="rounded-2xl bg-white py-16 text-center text-sm text-zinc-400 ring-1 ring-zinc-100">No orders match this filter.</div>
+        <div className="rounded-2xl bg-white py-16 text-center text-sm text-zinc-400 ring-1 ring-zinc-100">{t('orders.no_match')}</div>
       ) : (
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {filtered.map((o) => {
@@ -119,12 +121,12 @@ export default function OrdersPage() {
                 <div className="flex items-center gap-2">
                   <span className="font-display text-base font-bold text-zinc-900">{orderNumber(o.id)}</span>
                   <OrderTypeTag type={o.order_type} />
-                  <span className="ml-auto text-[11px] text-zinc-400">{timeAgo(o.created_at)}</span>
+                  <span className="ms-auto text-[11px] text-zinc-400">{timeAgo(o.created_at)}</span>
                 </div>
 
                 <div className="mt-2 space-y-1 text-xs text-zinc-500">
                   {o.order_type === 'dine_in' && (
-                    <p className="flex items-center gap-1.5 font-semibold text-zinc-700"><Users size={12} /> Table {o.table_number}</p>
+                    <p className="flex items-center gap-1.5 font-semibold text-zinc-700"><Users size={12} /> {t('orders.table')} {o.table_number}</p>
                   )}
                   {o.order_type === 'delivery' && (
                     <>
@@ -133,7 +135,7 @@ export default function OrdersPage() {
                       <p className="flex items-center gap-1.5"><MapPin size={11} /> {o.delivery_address}</p>
                     </>
                   )}
-                  {o.order_type === 'takeaway' && <p className="font-semibold text-zinc-700">Pickup at counter</p>}
+                  {o.order_type === 'takeaway' && <p className="font-semibold text-zinc-700">{t('orders.pickup_counter')}</p>}
                 </div>
 
                 <div className="mt-3 flex-1 rounded-xl bg-zinc-50 p-2.5 text-xs">
@@ -141,17 +143,17 @@ export default function OrdersPage() {
                     <div key={it.id} className="py-0.5">
                       <p className="flex justify-between text-zinc-600">
                         <span className="truncate">{it.quantity}× {it.product_name}</span>
-                        <span className="ml-2 shrink-0 text-zinc-400">{money(it.line_total)}</span>
+                        <span className="ms-2 shrink-0 text-zinc-400">{money(it.line_total)}</span>
                       </p>
                       {((it.sauces?.length ?? 0) > 0 || (it.supplements?.length ?? 0) > 0) && (
-                        <p className="truncate pl-3 text-[10px] text-zinc-400">
+                        <p className="truncate ps-3 text-[10px] text-zinc-400">
                           + {[...(it.sauces ?? []), ...(it.supplements ?? [])].map((s) => s.name).join(', ')}
                         </p>
                       )}
                     </div>
                   ))}
-                  {(!o.items || o.items.length === 0) && <p className="text-zinc-400">No items recorded</p>}
-                  {(o.items?.length ?? 0) > 4 && <p className="pt-0.5 text-[10px] text-zinc-400">+{o.items!.length - 4} more</p>}
+                  {(!o.items || o.items.length === 0) && <p className="text-zinc-400">{t('orders.no_items')}</p>}
+                  {(o.items?.length ?? 0) > 4 && <p className="pt-0.5 text-[10px] text-zinc-400">{t('orders.more', { n: o.items!.length - 4 })}</p>}
                 </div>
 
                 {o.notes && <p className="mt-2 rounded-lg bg-amber-50 px-2 py-1 text-[11px] text-amber-700">📝 {o.notes}</p>}
@@ -161,8 +163,8 @@ export default function OrdersPage() {
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => printInvoice(o)}
-                      title="Print invoice"
-                      aria-label="Print invoice"
+                      title={t('register.print_invoice')}
+                      aria-label={t('register.print_invoice')}
                       className="flex h-7 w-7 items-center justify-center rounded-lg text-zinc-400 hover:bg-zinc-50 hover:text-brand-600"
                     >
                       <Printer size={15} />
@@ -179,7 +181,7 @@ export default function OrdersPage() {
                         disabled={busyId === o.id}
                         className="flex-1 rounded-xl bg-brand-500 py-2 text-xs font-bold text-white transition hover:bg-brand-600 disabled:opacity-60"
                       >
-                        {busyId === o.id ? '…' : action.label}
+                        {busyId === o.id ? '…' : t(action.labelKey)}
                       </button>
                     )}
                     {cancellable && (
@@ -188,18 +190,18 @@ export default function OrdersPage() {
                         disabled={busyId === o.id}
                         className="rounded-xl border border-red-200 px-3 py-2 text-xs font-bold text-red-500 transition hover:bg-red-50 disabled:opacity-60"
                       >
-                        Cancel
+                        {t('orders.action.cancel')}
                       </button>
                     )}
                     {o.status === 'cancelled' && (
                       <button
                         onClick={async () => {
-                          if (!confirm(`Delete order ${orderNumber(o.id)} permanently?`)) return;
+                          if (!confirm(t('orders.delete_confirm', { id: orderNumber(o.id) }))) return;
                           await api('/api/orders', { method: 'DELETE', body: JSON.stringify({ id: o.id }) });
                           refresh();
                         }}
                         className="rounded-xl border border-zinc-200 p-2 text-zinc-400 hover:text-red-500"
-                        aria-label="Delete order"
+                        aria-label={t('orders.delete_order')}
                       >
                         <Trash2 size={14} />
                       </button>

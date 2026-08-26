@@ -1,7 +1,5 @@
 import supabase from './db-client.js';
 
-const CURRENCIES = ['EUR', 'USD', 'MAD', 'DZD'];
-
 async function requireAdmin(req, res) {
   const token = req.headers.authorization?.replace('Bearer ', '');
   if (!token) {
@@ -48,23 +46,8 @@ export default async function handler(req, res) {
       const fields = {};
 
       // Strings — trimmed, empty string allowed (e.g. clearing the logo).
-      for (const key of ['restaurant_name', 'address', 'phone', 'contact_email', 'opening_hours', 'logo_url', 'brand_color']) {
+      for (const key of ['restaurant_name', 'address', 'phone', 'contact_email', 'opening_hours', 'logo_url', 'brand_color', 'all_category_image_url']) {
         if (body[key] != null) fields[key] = String(body[key]).trim();
-      }
-
-      if (body.currency != null) {
-        if (!CURRENCIES.includes(body.currency)) {
-          return res.status(400).json({ error: `Invalid currency. Allowed: ${CURRENCIES.join(', ')}` });
-        }
-        fields.currency = body.currency;
-      }
-
-      if (body.tax_rate != null) {
-        const rate = Number(body.tax_rate);
-        if (isNaN(rate) || rate < 0 || rate > 1) {
-          return res.status(400).json({ error: 'tax_rate must be a number between 0 and 1' });
-        }
-        fields.tax_rate = rate;
       }
 
       for (const key of ['delivery_fee', 'delivery_min_order']) {
@@ -81,7 +64,7 @@ export default async function handler(req, res) {
         fields.low_stock_threshold = n;
       }
 
-      for (const key of ['payment_cash_enabled', 'payment_card_enabled', 'new_order_sound_enabled']) {
+      for (const key of ['new_order_sound_enabled']) {
         if (body[key] != null) fields[key] = Boolean(body[key]);
       }
 
