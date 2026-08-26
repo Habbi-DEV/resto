@@ -7,11 +7,8 @@ import {
 import supabase from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSettings } from '../../lib/settings';
-<<<<<<< HEAD
 import { useLang } from '../../lib/i18n';
 import LanguageSwitch from '../../components/LanguageSwitch';
-=======
->>>>>>> 32a7ccf652c6bac393a9af856a184051d77d71a6
 import type { Stats } from '../../lib/types';
 
 const NAV = [
