@@ -5,7 +5,10 @@ import { api } from '../../lib/api';
 import supabase from '../../lib/supabase';
 import { money } from '../../lib/format';
 import { setCachedSettings, useSettings } from '../../lib/settings';
+<<<<<<< HEAD
 import { useLang } from '../../lib/i18n';
+=======
+>>>>>>> 32a7ccf652c6bac393a9af856a184051d77d71a6
 import Modal from '../../components/ui/Modal';
 import Spinner from '../../components/ui/Spinner';
 
@@ -209,11 +212,19 @@ export default function MenuManagePage() {
         body: JSON.stringify({ fileName: file.name, fileBase64: base64, contentType: file.type }),
       });
       const data = await res.json();
+<<<<<<< HEAD
       if (!res.ok) throw new Error(data.error || t('common.upload_failed'));
       const updated = await api<Settings>('/api/settings', { method: 'PUT', body: JSON.stringify({ all_category_image_url: data.url }) });
       if (updated) setCachedSettings(updated);
     } catch (err) {
       setError(err instanceof Error ? err.message : t('common.upload_failed'));
+=======
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+      const updated = await api<Settings>('/api/settings', { method: 'PUT', body: JSON.stringify({ all_category_image_url: data.url }) });
+      if (updated) setCachedSettings(updated);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Upload failed');
+>>>>>>> 32a7ccf652c6bac393a9af856a184051d77d71a6
     } finally {
       setUploadingAllIcon(false);
     }
@@ -239,7 +250,11 @@ export default function MenuManagePage() {
         body: JSON.stringify({ fileName: file.name, fileBase64: base64, contentType: file.type }),
       });
       const data = await res.json();
+<<<<<<< HEAD
       if (!res.ok) throw new Error(data.error || t('common.upload_failed'));
+=======
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+>>>>>>> 32a7ccf652c6bac393a9af856a184051d77d71a6
 
       if (target === 'new') {
         setNewCat((c) => ({ ...c, image_url: data.url }));
@@ -248,7 +263,11 @@ export default function MenuManagePage() {
         load();
       }
     } catch (err) {
+<<<<<<< HEAD
       setError(err instanceof Error ? err.message : t('common.upload_failed'));
+=======
+      setError(err instanceof Error ? err.message : 'Category photo upload failed');
+>>>>>>> 32a7ccf652c6bac393a9af856a184051d77d71a6
     } finally {
       setUploadingCategoryPhoto(null);
     }
@@ -276,14 +295,22 @@ export default function MenuManagePage() {
         body: JSON.stringify({ fileName: file.name, fileBase64: base64, contentType: file.type }),
       });
       const data = await res.json();
+<<<<<<< HEAD
       if (!res.ok) throw new Error(data.error || t('common.upload_failed'));
+=======
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+>>>>>>> 32a7ccf652c6bac393a9af856a184051d77d71a6
       await api('/api/categories', {
         method: 'POST',
         body: JSON.stringify({ type: 'promotion', image_url: data.url, sort_order: promotions.length }),
       });
       load();
     } catch (err) {
+<<<<<<< HEAD
       setError(err instanceof Error ? err.message : t('common.upload_failed'));
+=======
+      setError(err instanceof Error ? err.message : 'Banner upload failed');
+>>>>>>> 32a7ccf652c6bac393a9af856a184051d77d71a6
     } finally {
       setUploadingPromotion(false);
     }
@@ -295,7 +322,11 @@ export default function MenuManagePage() {
   };
 
   const removePromotion = async (p: Promotion) => {
+<<<<<<< HEAD
     if (!confirm(t('menu.delete_banner_confirm'))) return;
+=======
+    if (!confirm('Delete this promo banner?')) return;
+>>>>>>> 32a7ccf652c6bac393a9af856a184051d77d71a6
     await api('/api/categories', { method: 'DELETE', body: JSON.stringify({ id: p.id, type: 'promotion' }) }).catch(console.error);
     load();
   };
@@ -533,11 +564,19 @@ export default function MenuManagePage() {
 
       {/* categories */}
       <div className="mb-6 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-zinc-100">
+<<<<<<< HEAD
         <h2 className="mb-1 font-display text-sm font-bold text-zinc-900">{t('menu.categories')}</h2>
         <p className="mb-3 text-xs text-zinc-400">{t('menu.categories.desc')}</p>
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex items-center gap-2 rounded-full border border-zinc-200 bg-white py-1.5 ps-1.5 pe-3 text-xs font-semibold text-zinc-700">
             <label className="group relative h-7 w-7 shrink-0 cursor-pointer" title={t('menu.upload_all_tile')}>
+=======
+        <h2 className="mb-1 font-display text-sm font-bold text-zinc-900">Categories</h2>
+        <p className="mb-3 text-xs text-zinc-400">Shown as square icons above the product grid. Upload a photo for one, or leave it blank to show the emoji instead.</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2 rounded-full border border-zinc-200 bg-white py-1.5 pl-1.5 pr-3 text-xs font-semibold text-zinc-700">
+            <label className="group relative h-7 w-7 shrink-0 cursor-pointer" title="Click to upload a photo for the All tile">
+>>>>>>> 32a7ccf652c6bac393a9af856a184051d77d71a6
               {settings?.all_category_image_url ? (
                 <img src={settings.all_category_image_url} alt="" className="h-7 w-7 rounded-lg object-cover ring-1 ring-zinc-200" />
               ) : (
@@ -553,11 +592,19 @@ export default function MenuManagePage() {
                 onChange={(e) => e.target.files?.[0] && uploadAllCategoryImage(e.target.files[0])}
               />
             </label>
+<<<<<<< HEAD
             <span>{t('menu.all')}</span>
           </div>
           {categories.map((c) => (
             <div key={c.id} className={`flex items-center gap-2 rounded-full border py-1.5 ps-1.5 pe-1.5 text-xs font-semibold ${c.is_active ? 'border-zinc-200 bg-white text-zinc-700' : 'border-dashed border-zinc-200 bg-zinc-50 text-zinc-400'}`}>
               <label className="group relative h-7 w-7 shrink-0 cursor-pointer" title={t('menu.upload_photo')}>
+=======
+            <span>All</span>
+          </div>
+          {categories.map((c) => (
+            <div key={c.id} className={`flex items-center gap-2 rounded-full border py-1.5 pl-1.5 pr-1.5 text-xs font-semibold ${c.is_active ? 'border-zinc-200 bg-white text-zinc-700' : 'border-dashed border-zinc-200 bg-zinc-50 text-zinc-400'}`}>
+              <label className="group relative h-7 w-7 shrink-0 cursor-pointer" title="Click to upload a photo">
+>>>>>>> 32a7ccf652c6bac393a9af856a184051d77d71a6
                 {c.image_url ? (
                   <img src={c.image_url} alt="" className={`h-7 w-7 rounded-lg object-cover ring-1 ring-zinc-200 ${c.is_active ? '' : 'opacity-40 grayscale'}`} />
                 ) : (
@@ -574,12 +621,20 @@ export default function MenuManagePage() {
                 />
               </label>
               <span>{c.name}</span>
+<<<<<<< HEAD
               <button onClick={() => toggleCategory(c)} title={c.is_active ? t('menu.deactivate') : t('menu.activate')} className={`h-2 w-2 rounded-full ${c.is_active ? 'bg-brand-500' : 'bg-zinc-300'}`} />
+=======
+              <button onClick={() => toggleCategory(c)} title={c.is_active ? 'Deactivate' : 'Activate'} className={`h-2 w-2 rounded-full ${c.is_active ? 'bg-brand-500' : 'bg-zinc-300'}`} />
+>>>>>>> 32a7ccf652c6bac393a9af856a184051d77d71a6
               <button onClick={() => removeCategory(c)} className="text-zinc-300 hover:text-red-500"><Trash2 size={12} /></button>
             </div>
           ))}
           <div className="flex items-center gap-1.5">
+<<<<<<< HEAD
             <label className="group relative h-7 w-7 shrink-0 cursor-pointer" title={t('menu.optional_photo')}>
+=======
+            <label className="group relative h-7 w-7 shrink-0 cursor-pointer" title="Optional photo — the emoji shows if you skip this">
+>>>>>>> 32a7ccf652c6bac393a9af856a184051d77d71a6
               {newCat.image_url ? (
                 <img src={newCat.image_url} alt="" className="h-7 w-7 rounded-lg object-cover ring-1 ring-zinc-200" />
               ) : (
@@ -606,8 +661,13 @@ export default function MenuManagePage() {
 
       {/* promo banners */}
       <div className="mb-6 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-zinc-100">
+<<<<<<< HEAD
         <h2 className="mb-1 font-display text-sm font-bold text-zinc-900">{t('menu.promo_banners')}</h2>
         <p className="mb-3 text-xs text-zinc-400">{t('menu.promo_banners.desc')}</p>
+=======
+        <h2 className="mb-1 font-display text-sm font-bold text-zinc-900">Promo banners</h2>
+        <p className="mb-3 text-xs text-zinc-400">Full-width images in a carousel under the top bar, above the categories — design any offer text into the picture itself. Hide one here to pull it from the e-menu without deleting it.</p>
+>>>>>>> 32a7ccf652c6bac393a9af856a184051d77d71a6
         <div className="flex flex-wrap items-start gap-3">
           {promotions.map((p) => (
             <div key={p.id} className="flex flex-col items-center gap-1.5">
@@ -615,8 +675,13 @@ export default function MenuManagePage() {
                 <img src={p.image_url} alt="" className="h-full w-full object-cover" />
               </div>
               <div className="flex items-center gap-1.5">
+<<<<<<< HEAD
                 <button onClick={() => togglePromotionActive(p)} title={p.is_active ? t('menu.hide_from_menu') : t('menu.show_on_menu')} className={`rounded-full px-2 py-0.5 text-[9px] font-bold ${p.is_active ? 'bg-brand-50 text-brand-700' : 'bg-zinc-100 text-zinc-400'}`}>
                   {p.is_active ? t('menu.visible') : t('menu.hidden')}
+=======
+                <button onClick={() => togglePromotionActive(p)} title={p.is_active ? 'Hide from e-menu' : 'Show on e-menu'} className={`rounded-full px-2 py-0.5 text-[9px] font-bold ${p.is_active ? 'bg-brand-50 text-brand-700' : 'bg-zinc-100 text-zinc-400'}`}>
+                  {p.is_active ? 'Visible' : 'Hidden'}
+>>>>>>> 32a7ccf652c6bac393a9af856a184051d77d71a6
                 </button>
                 <button onClick={() => removePromotion(p)} className="text-zinc-300 hover:text-red-500"><Trash2 size={11} /></button>
               </div>
@@ -624,11 +689,19 @@ export default function MenuManagePage() {
           ))}
           <label className="flex h-16 w-28 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-zinc-200 text-zinc-400 transition hover:border-brand-300 hover:text-brand-500">
             {uploadingPromotion ? (
+<<<<<<< HEAD
               <span className="text-[10px] font-bold">{t('menu.uploading')}</span>
             ) : (
               <>
                 <ImagePlus size={16} />
                 <span className="text-[9px] font-bold">{t('menu.add_banner')}</span>
+=======
+              <span className="text-[10px] font-bold">Uploading…</span>
+            ) : (
+              <>
+                <ImagePlus size={16} />
+                <span className="text-[9px] font-bold">Add banner</span>
+>>>>>>> 32a7ccf652c6bac393a9af856a184051d77d71a6
               </>
             )}
             <input

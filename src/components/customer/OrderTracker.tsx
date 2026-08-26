@@ -4,7 +4,10 @@ import type { Order, OrderStatus } from '../../lib/types';
 import { orderNumber } from '../../lib/format';
 import { printInvoice } from '../../lib/invoice';
 import { ORDER_STATUS_HINT, ORDER_STATUS_LABEL } from '../../lib/orderStatus';
+<<<<<<< HEAD
 import { useLang } from '../../lib/i18n';
+=======
+>>>>>>> 32a7ccf652c6bac393a9af856a184051d77d71a6
 
 const STEPS: OrderStatus[] = ['pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery', 'completed'];
 
@@ -19,7 +22,10 @@ interface Props {
 }
 
 export default function OrderTracker({ order: initial, onClose, onUpdate }: Props) {
+<<<<<<< HEAD
   const { t } = useLang();
+=======
+>>>>>>> 32a7ccf652c6bac393a9af856a184051d77d71a6
   const [order, setOrder] = useState<Order>(initial);
 
   useEffect(() => {

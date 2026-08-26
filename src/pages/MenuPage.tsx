@@ -3,7 +3,11 @@ import { motion } from 'framer-motion';
 import { Bell, Search, ShoppingBag, ShoppingBasket, UtensilsCrossed, X } from 'lucide-react';
 import type { Category, Order, Product, Promotion } from '../lib/types';
 import { ACTIVE_STATUSES } from '../lib/types';
+<<<<<<< HEAD
 import { money } from '../lib/format';
+=======
+import { money } from './menu-helpers';
+>>>>>>> 32a7ccf652c6bac393a9af856a184051d77d71a6
 import { useSettings } from '../lib/settings';
 import { useCartStore, selectCount, selectSubtotal } from '../stores/cartStore';
 import ProductCard from '../components/customer/ProductCard';
@@ -13,13 +17,52 @@ import OrderTracker from '../components/customer/OrderTracker';
 import Spinner from '../components/ui/Spinner';
 import { playChime, unlockChime } from '../lib/chime';
 import { ORDER_STATUS_HINT, ORDER_STATUS_LABEL } from '../lib/orderStatus';
+<<<<<<< HEAD
 import { useLang } from '../lib/i18n';
 
+=======
+
+// Small, self-contained dictionary for the fixed shell text on this page
+>>>>>>> 32a7ccf652c6bac393a9af856a184051d77d71a6
 // Persists the last placed order's id across a page reload/close, purely
 // client-side (there's no customer login to key this off of). Only the id
 // is stored — the actual order data is always re-fetched fresh from the
 // server, never trusted from storage.
 const LAST_ORDER_KEY = 'restolink:lastOrderId';
+<<<<<<< HEAD
+=======
+
+// only (header, nav, loading/empty states, search). Category and product
+// names come from the admin panel and are shown as entered — there's no
+// stored translation for them, so they don't switch with the toggle.
+// Sauce/supplement labels, the cart, and checkout aren't covered either;
+// wiring those up would need a proper translation store, a bigger job than
+// this page's own text.
+const STRINGS = {
+  en: {
+    all: 'All',
+    loading: 'Loading the menu…',
+    empty: 'Nothing here yet — check another category!',
+    searchPlaceholder: 'Search products…',
+    noResults: (q: string) => `No products match "${q}"`,
+    menu: 'Menu',
+    search: 'Search',
+    viewCart: 'View cart',
+    item: (n: number) => (n === 1 ? '1 item' : `${n} items`),
+  },
+  fr: {
+    all: 'Tout',
+    loading: 'Chargement du menu…',
+    empty: 'Rien ici pour le moment — essayez une autre catégorie !',
+    searchPlaceholder: 'Rechercher un produit…',
+    noResults: (q: string) => `Aucun produit ne correspond à "${q}"`,
+    menu: 'Menu',
+    search: 'Recherche',
+    viewCart: 'Voir le panier',
+    item: (n: number) => (n === 1 ? '1 article' : `${n} articles`),
+  },
+} as const;
+>>>>>>> 32a7ccf652c6bac393a9af856a184051d77d71a6
 
 export default function MenuPage() {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -29,6 +72,10 @@ export default function MenuPage() {
   const [activeCat, setActiveCat] = useState<number | 'all'>('all');
   const [detail, setDetail] = useState<Product | null>(null);
   const [cartOpen, setCartOpen] = useState(false);
+<<<<<<< HEAD
+=======
+  const [lang, setLang] = useState<'en' | 'fr'>('en');
+>>>>>>> 32a7ccf652c6bac393a9af856a184051d77d71a6
   const [searchOpen, setSearchOpen] = useState(false);
   const [search, setSearch] = useState('');
 
@@ -46,7 +93,11 @@ export default function MenuPage() {
   const [trackerOpen, setTrackerOpen] = useState(false);
   const [orderUnseen, setOrderUnseen] = useState(false);
 
+<<<<<<< HEAD
   const { t, lang, setLang } = useLang();
+=======
+  const t = STRINGS[lang];
+>>>>>>> 32a7ccf652c6bac393a9af856a184051d77d71a6
   const settings = useSettings();
   const count = useCartStore(selectCount);
   const subtotal = useCartStore(selectSubtotal);
@@ -177,11 +228,21 @@ export default function MenuPage() {
             <div className="ml-auto flex items-center gap-2">
               <div className="flex rounded-full bg-zinc-100 p-0.5">
                 <button
+<<<<<<< HEAD
+=======
+                  onClick={() => setLang('en')}
+                  className={`rounded-full px-2.5 py-1 text-[10px] font-bold transition ${lang === 'en' ? 'bg-brand-500 text-white' : 'text-zinc-500'}`}
+                >
+                  EN
+                </button>
+                <button
+>>>>>>> 32a7ccf652c6bac393a9af856a184051d77d71a6
                   onClick={() => setLang('fr')}
                   className={`rounded-full px-2.5 py-1 text-[10px] font-bold transition ${lang === 'fr' ? 'bg-brand-500 text-white' : 'text-zinc-500'}`}
                 >
                   FR
                 </button>
+<<<<<<< HEAD
                 <button
                   onClick={() => setLang('ar')}
                   className={`rounded-full px-2.5 py-1 text-[10px] font-bold transition ${lang === 'ar' ? 'bg-brand-500 text-white' : 'text-zinc-500'}`}
@@ -192,11 +253,21 @@ export default function MenuPage() {
               <button
                 onClick={() => setCartOpen(true)}
                 aria-label={t('shop.cart_aria')}
+=======
+              </div>
+              <button
+                onClick={() => setCartOpen(true)}
+                aria-label="Cart"
+>>>>>>> 32a7ccf652c6bac393a9af856a184051d77d71a6
                 className="relative flex h-9 w-9 items-center justify-center rounded-full text-zinc-700 transition hover:bg-zinc-100"
               >
                 <ShoppingBag size={19} />
                 {count > 0 && (
+<<<<<<< HEAD
                   <span className="absolute -end-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-500 px-1 text-[9px] font-bold text-white">
+=======
+                  <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-500 px-1 text-[9px] font-bold text-white">
+>>>>>>> 32a7ccf652c6bac393a9af856a184051d77d71a6
                     {count}
                   </span>
                 )}
@@ -229,7 +300,11 @@ export default function MenuPage() {
                       const el = bannerRef.current;
                       if (el) el.scrollTo({ left: i * el.clientWidth, behavior: 'smooth' });
                     }}
+<<<<<<< HEAD
                     aria-label={t('shop.go_to_banner', { n: i + 1 })}
+=======
+                    aria-label={`Go to banner ${i + 1}`}
+>>>>>>> 32a7ccf652c6bac393a9af856a184051d77d71a6
                     className={`h-1.5 rounded-full transition-all ${i === bannerIdx ? 'w-4 bg-brand-500' : 'w-1.5 bg-zinc-200'}`}
                   />
                 ))}
@@ -259,7 +334,11 @@ export default function MenuPage() {
                 '✨'
               )}
             </span>
+<<<<<<< HEAD
             <span className={`text-[10px] font-semibold ${activeCat === 'all' ? 'text-brand-600' : 'text-zinc-500'}`}>{t('shop.all')}</span>
+=======
+            <span className={`text-[10px] font-semibold ${activeCat === 'all' ? 'text-brand-600' : 'text-zinc-500'}`}>{t.all}</span>
+>>>>>>> 32a7ccf652c6bac393a9af856a184051d77d71a6
           </button>
           {categories.filter((c) => c.is_active).map((c) => (
             <button key={c.id} onClick={() => setActiveCat(c.id)} className="flex shrink-0 flex-col items-center gap-1.5">
@@ -291,11 +370,19 @@ export default function MenuPage() {
                 autoFocus
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
+<<<<<<< HEAD
                 placeholder={t('shop.search_placeholder')}
                 className="flex-1 bg-transparent text-[13px] text-zinc-800 placeholder:text-zinc-400 focus:outline-none"
               />
               {search && (
                 <button onClick={() => setSearch('')} className="shrink-0 text-zinc-400" aria-label={t('shop.clear_search')}>
+=======
+                placeholder={t.searchPlaceholder}
+                className="flex-1 bg-transparent text-[13px] text-zinc-800 placeholder:text-zinc-400 focus:outline-none"
+              />
+              {search && (
+                <button onClick={() => setSearch('')} className="shrink-0 text-zinc-400" aria-label="Clear search">
+>>>>>>> 32a7ccf652c6bac393a9af856a184051d77d71a6
                   <X size={14} />
                 </button>
               )}
@@ -305,9 +392,15 @@ export default function MenuPage() {
 
         {/* product grid */}
         {loading ? (
+<<<<<<< HEAD
           <Spinner label={t('shop.loading')} />
         ) : visible.length === 0 ? (
           <p className="py-16 text-center text-sm text-zinc-400">{search ? t('shop.no_results', { q: search }) : t('shop.empty')}</p>
+=======
+          <Spinner label={t.loading} />
+        ) : visible.length === 0 ? (
+          <p className="py-16 text-center text-sm text-zinc-400">{search ? t.noResults(search) : t.empty}</p>
+>>>>>>> 32a7ccf652c6bac393a9af856a184051d77d71a6
         ) : (
           <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
             {visible.map((p) => (
@@ -327,9 +420,15 @@ export default function MenuPage() {
         >
           <span className="flex items-center gap-2 text-sm font-semibold">
             <ShoppingBasket size={18} className="text-brand-400" />
+<<<<<<< HEAD
             {count} {count === 1 ? t('cart.items') : t('cart.items_plural')}
           </span>
           <span className="font-display text-[15px] font-bold">{t('shop.view_cart')} · {money(subtotal)}</span>
+=======
+            {t.item(count)}
+          </span>
+          <span className="font-display text-[15px] font-bold">{t.viewCart} · {money(subtotal)}</span>
+>>>>>>> 32a7ccf652c6bac393a9af856a184051d77d71a6
         </motion.button>
       )}
 
@@ -338,7 +437,11 @@ export default function MenuPage() {
         <div className="mx-auto flex max-w-md items-center justify-around px-6 pb-[calc(10px+env(safe-area-inset-bottom))] pt-2.5 md:max-w-3xl lg:max-w-5xl">
           <button onClick={() => setSearchOpen(false)} className="flex flex-col items-center gap-0.5">
             <UtensilsCrossed size={19} className={!searchOpen ? 'text-zinc-900' : 'text-zinc-400'} />
+<<<<<<< HEAD
             <span className={`text-[10px] font-semibold ${!searchOpen ? 'text-zinc-900' : 'text-zinc-400'}`}>{t('shop.nav_menu')}</span>
+=======
+            <span className={`text-[10px] font-semibold ${!searchOpen ? 'text-zinc-900' : 'text-zinc-400'}`}>{t.menu}</span>
+>>>>>>> 32a7ccf652c6bac393a9af856a184051d77d71a6
           </button>
           <button
             onClick={() => {
@@ -351,7 +454,11 @@ export default function MenuPage() {
             className="flex flex-col items-center gap-0.5"
           >
             <Search size={19} className={searchOpen ? 'text-zinc-900' : 'text-zinc-400'} />
+<<<<<<< HEAD
             <span className={`text-[10px] font-semibold ${searchOpen ? 'text-zinc-900' : 'text-zinc-400'}`}>{t('shop.nav_search')}</span>
+=======
+            <span className={`text-[10px] font-semibold ${searchOpen ? 'text-zinc-900' : 'text-zinc-400'}`}>{t.search}</span>
+>>>>>>> 32a7ccf652c6bac393a9af856a184051d77d71a6
           </button>
           <button
             onClick={() => {
@@ -360,12 +467,21 @@ export default function MenuPage() {
               setOrderUnseen(false);
             }}
             disabled={!order}
+<<<<<<< HEAD
             aria-label={t('shop.order_status_aria')}
             title={order ? undefined : t('shop.no_active_order')}
             className={`relative flex h-9 w-9 items-center justify-center rounded-full transition ${order ? 'bg-brand-500 text-white' : 'bg-zinc-100 text-zinc-300'}`}
           >
             <Bell size={17} />
             {orderUnseen && <span className="absolute -end-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white" />}
+=======
+            aria-label="Order status"
+            title={order ? undefined : 'No active order yet'}
+            className={`relative flex h-9 w-9 items-center justify-center rounded-full transition ${order ? 'bg-brand-500 text-white' : 'bg-zinc-100 text-zinc-300'}`}
+          >
+            <Bell size={17} />
+            {orderUnseen && <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white" />}
+>>>>>>> 32a7ccf652c6bac393a9af856a184051d77d71a6
           </button>
         </div>
       </nav>
